@@ -224,7 +224,6 @@ div.stButton > button:hover {
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        # Load from Streamlit secrets
         firebase_config = dict(st.secrets["firebase"])
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False
@@ -234,6 +233,7 @@ def init_firebase():
         cred = credentials.Certificate(tmp_path)
         firebase_admin.initialize_app(cred)
         os.unlink(tmp_path)
+    # prefer_rest=True avoids grpcio entirely — works on Python 3.14
     return firestore.client(prefer_rest=True)
 
 try:

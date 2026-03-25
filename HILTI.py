@@ -234,7 +234,7 @@ def init_firebase():
         firebase_admin.initialize_app(cred)
         os.unlink(tmp_path)
     # prefer_rest=True avoids grpcio entirely — works on Python 3.14
-    return firestore.client(prefer_rest=True)
+    return firestore.client()
 
 try:
     db = init_firebase()

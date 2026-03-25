@@ -224,21 +224,36 @@ div.stButton > button:hover {
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        firebase_config = dict(st.secrets["firebase"])
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
-            json.dump(firebase_config, f)
-            tmp_path = f.name
-        cred = credentials.Certificate(tmp_path)
-        firebase_admin.initialize_app(cred)
-        os.unlink(tmp_path)
-    # prefer_rest=True avoids grpcio entirely — works on Python 3.14
+        try:
+            # Lấy cấu hình từ Streamlit Secrets
+            firebase_config = dict(st.secrets["firebase"])
+            
+            # Tạo file tạm để chứa key JSON
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+                json.dump(firebase_config, f)
+                tmp_path = f.name
+            
+            # Khởi tạo Firebase với file tạm
+            cred = credentials.Certificate(tmp_path)
+            firebase_admin.initialize_app(cred)
+            
+            # Xóa file tạm sau khi đã khởi tạo xong
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except Exception as e:
+            st.error(f"Lỗi khởi tạo Firebase: {e}")
+            return None
+            
+    # QUAN TRỌNG: Bỏ tham số prefer_rest=True để tránh lỗi TypeError
     return firestore.client()
 
 try:
     db = init_firebase()
-    firebase_ok = True
+    if db:
+        firebase_ok = True
+    else:
+        firebase_ok = False
+        firebase_error = "Không thể khởi tạo Firestore client."
 except Exception as e:
     firebase_ok = False
     firebase_error = str(e)

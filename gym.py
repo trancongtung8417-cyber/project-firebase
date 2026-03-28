@@ -363,29 +363,50 @@ def page_confirm_session():
         st.markdown('<div class="card card-ok">Tất cả buổi tập đã được cập nhật!</div>',unsafe_allow_html=True)
         return
     st.markdown(f'<div style="background:rgba(243,156,18,.1);border:1px solid var(--warning);border-radius:10px;padding:.8rem 1rem;margin-bottom:1.2rem;font-size:.88rem">⚠️ Bạn có <b style="color:var(--warning)">{len(pending)} buổi tập</b> cần xác nhận. Sau khi xác nhận, số buổi sẽ tự động trừ.</div>',unsafe_allow_html=True)
-    for idx,p in enumerate(pending):
-        mid=p.get("membership_id","")
-        mem=next((m for m in st.session_state.memberships if m["id"]==mid),None)
-        left=sessions_remaining(mem) if mem else "?"
-        st.markdown(f'<div class="confirm-box"><div class="confirm-title">📋 Buổi tập #{idx+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem"><div>📅 Ngày: <b>{p["session_date"]}</b></div><div>🕐 Giờ: <b>{p["session_time"]}</b></div><div>💪 PT: <b>{p["pt_name"]}</b></div><div>🎫 Còn lại: <b style="color:var(--primary)">{left} buổi</b></div></div><div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> {p["content"]}</div>{f\'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>\' if p.get("note") else ""}</div>',unsafe_allow_html=True)
-        col_ok,col_no,_=st.columns([1,1,2])
+    
+    for idx, p in enumerate(pending):
+        mid = p.get("membership_id", "")
+        mem = next((m for m in st.session_state.memberships if m["id"] == mid), None)
+        left = sessions_remaining(mem) if mem else "?"
+        
+        # SỬA TẠI ĐÂY: Tách phần ghi chú ra riêng để tránh lỗi lồng f-string
+        note_html = ""
+        if p.get("note"):
+            note_html = f'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>'
+        
+        # Sử dụng dấu nháy ba (triple quotes) để chuỗi HTML sạch sẽ hơn
+        st.markdown(f"""
+            <div class="confirm-box">
+                <div class="confirm-title">📋 Buổi tập #{idx+1}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem">
+                    <div>📅 Ngày: <b>{p["session_date"]}</b></div>
+                    <div>🕐 Giờ: <b>{p["session_time"]}</b></div>
+                    <div>💪 PT: <b>{p["pt_name"]}</b></div>
+                    <div>🎫 Còn lại: <b style="color:var(--primary)">{left} buổi</b></div>
+                </div>
+                <div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> {p["content"]}</div>
+                {note_html}
+            </div>
+        """, unsafe_allow_html=True)
+        
+        col_ok, col_no, _ = st.columns([1, 1, 2])
         with col_ok:
-            if st.button(f"✅ Xác nhận",key=f"confirm_{p['id']}",use_container_width=True):
+            if st.button(f"✅ Xác nhận", key=f"confirm_{p['id']}", use_container_width=True):
                 for pp in st.session_state.pending_list:
-                    if pp["id"]==p["id"]: pp["status"]="confirmed"
+                    if pp["id"] == p["id"]: pp["status"] = "confirmed"
                 for m in st.session_state.memberships:
-                    if m["id"]==mid:
-                        m["sessions_done"]=m.get("sessions_done",0)+1
-                        if m["sessions_done"]>=m.get("sessions_total",0): m["status"]="completed"
-                st.session_state.sessions_log.append({"id":f"s{len(st.session_state.sessions_log)+1}","membership_id":mid,"customer_id":cid,"pt_id":p["pt_id"],"session_date":p["session_date"],"session_time":p["session_time"],"content":p["content"],"note":p.get("note",""),"weight":0,"confirmed":True})
-                if db: db.collection("sessions").add({"membership_id":mid,"customer_id":cid,"session_date":p["session_date"],"content":p["content"],"confirmed":True,"confirmed_at":datetime.now().isoformat()})
+                    if m["id"] == mid:
+                        m["sessions_done"] = m.get("sessions_done", 0) + 1
+                        if m["sessions_done"] >= m.get("sessions_total", 0): m["status"] = "completed"
+                st.session_state.sessions_log.append({"id": f"s{len(st.session_state.sessions_log)+1}", "membership_id": mid, "customer_id": cid, "pt_id": p["pt_id"], "session_date": p["session_date"], "session_time": p["session_time"], "content": p["content"], "note": p.get("note", ""), "weight": 0, "confirmed": True})
+                if db: db.collection("sessions").add({"membership_id": mid, "customer_id": cid, "session_date": p["session_date"], "content": p["content"], "confirmed": True, "confirmed_at": datetime.now().isoformat()})
                 st.success("✅ Đã xác nhận! Số buổi đã được cập nhật."); st.rerun()
         with col_no:
-            if st.button(f"❌ Từ chối",key=f"reject_{p['id']}",use_container_width=True):
+            if st.button(f"❌ Từ chối", key=f"reject_{p['id']}", use_container_width=True):
                 for pp in st.session_state.pending_list:
-                    if pp["id"]==p["id"]: pp["status"]="rejected"
+                    if pp["id"] == p["id"]: pp["status"] = "rejected"
                 st.warning("Đã từ chối buổi tập."); st.rerun()
-        st.markdown("<hr>",unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
 def page_my_sessions():
     st.markdown("# 📖 Nhật ký tập"); st.markdown("---")

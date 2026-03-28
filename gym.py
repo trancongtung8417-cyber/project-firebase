@@ -19,7 +19,11 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-
+/* Hiển thị Header nhưng làm trong suốt nền */
+header[data-testid="stHeader"] {
+    background-color: rgba(0,0,0,0) !important;
+    color: white !important;
+}
 
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}

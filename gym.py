@@ -86,32 +86,38 @@ LOGO_SVG = """<svg width="56" height="56" viewBox="0 0 60 60" fill="none" xmlns=
 
 @st.cache_resource
 def init_firebase():
-    if not firebase_admin._apps:
-        if "firebase" in st.secrets:
-            fb = st.secrets["firebase"]
-            # Làm sạch khóa: Chuyển \n văn bản thành xuống dòng và xóa khoảng trắng thừa
-            raw_key = fb["private_key"]
-            clean_key = raw_key.replace("\\n", "\n").strip()
-            
-            cred = credentials.Certificate({
-                "type": fb["type"],
-                "project_id": fb["project_id"],
-                "private_key_id": fb["private_key_id"],
-                "private_key": clean_key,
-                "client_email": fb["client_email"],
-                "client_id": fb["client_id"],
-                "auth_uri": fb["auth_uri"],
-                "token_uri": fb["token_uri"],
-                "auth_provider_x509_cert_url": fb["auth_provider_x509_cert_url"],
-                "client_x509_cert_url": fb["client_x509_cert_url"],
-            })
-        else:
-            # Chạy local với file JSON
+    try:
+        if not firebase_admin._apps:
+            # Try Streamlit secrets first
+            try:
+                fb = st.secrets["firebase"]
+                cred = credentials.Certificate({
+                    "type": fb["type"],
+                    "project_id": fb["project_id"],
+                    "private_key_id": fb["private_key_id"],
+                    "private_key": fb["private_key"].replace("\\n", "\n"),
+                    "client_email": fb["client_email"],
+                    "client_id": fb["client_id"],
+                    "auth_uri": fb["auth_uri"],
+                    "token_uri": fb["token_uri"],
+                    "auth_provider_x509_cert_url": fb["auth_provider_x509_cert_url"],
+                    "client_x509_cert_url": fb["client_x509_cert_url"],
+                })
+                firebase_admin.initialize_app(cred)
+                return firestore.client()
+            except Exception:
+                pass
+            # Try local service account file
             key_path = Path(__file__).parent / "serviceAccountKey.json"
-            if not key_path.exists(): return None
-            cred = credentials.Certificate(str(key_path))
-        firebase_admin.initialize_app(cred)
-    return firestore.client()
+            if key_path.exists():
+                cred = credentials.Certificate(str(key_path))
+                firebase_admin.initialize_app(cred)
+                return firestore.client()
+        else:
+            return firestore.client()
+    except Exception:
+        pass
+    return None  # Demo mode
 
 db = init_firebase()
 
@@ -170,18 +176,28 @@ if "memberships" not in st.session_state:
 if "sessions_log" not in st.session_state:
     st.session_state.sessions_log=[s.copy() for s in MOCK_SESSIONS]
 
-def login(email,password):
-    if db:
-        for doc in db.collection("users").where("email","==",email).limit(1).stream():
-            u=doc.to_dict()
-            if u.get("password")==password:
-                st.session_state.logged_in=True
-                st.session_state.user={**u,"id":doc.id}
-                return True
-        return False
-    if email in MOCK_USERS and MOCK_USERS[email]["password"]==password:
-        u=MOCK_USERS[email].copy();u["email"]=email
-        st.session_state.logged_in=True;st.session_state.user=u;return True
+def login(email, password):
+    # Try Firebase first (only if connected)
+    if db is not None:
+        try:
+            for doc in db.collection("users").where("email","==",email).limit(1).stream():
+                u = doc.to_dict()
+                if u.get("password") == password:
+                    st.session_state.logged_in = True
+                    st.session_state.user = {**u, "id": doc.id}
+                    return True
+            return False  # Firebase connected but user not found
+        except Exception:
+            pass  # Fall through to mock on Firebase error
+
+    # Demo / mock mode
+    email = email.strip().lower()
+    if email in MOCK_USERS and MOCK_USERS[email]["password"] == password:
+        u = MOCK_USERS[email].copy()
+        u["email"] = email
+        st.session_state.logged_in = True
+        st.session_state.user = u
+        return True
     return False
 
 def days_left(end_date_str):
@@ -371,82 +387,38 @@ def page_confirm_session():
         st.markdown('<div class="card card-ok">Tất cả buổi tập đã được cập nhật!</div>',unsafe_allow_html=True)
         return
     st.markdown(f'<div style="background:rgba(243,156,18,.1);border:1px solid var(--warning);border-radius:10px;padding:.8rem 1rem;margin-bottom:1.2rem;font-size:.88rem">⚠️ Bạn có <b style="color:var(--warning)">{len(pending)} buổi tập</b> cần xác nhận. Sau khi xác nhận, số buổi sẽ tự động trừ.</div>',unsafe_allow_html=True)
-    
-    for idx, p in enumerate(pending):
-        mid = p.get("membership_id", "")
-        mem = next((m for m in st.session_state.memberships if m["id"] == mid), None)
-        left = sessions_remaining(mem) if mem else "?"
-        
-        # Sửa: Tách phần ghi chú để tránh lỗi lồng f-string
-        note_html = ""
-        if p.get("note"):
-            note_html = f'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>'
-        
-        st.markdown(f"""
-            <div class="confirm-box">
-                <div class="confirm-title">📋 Buổi tập #{idx+1}</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem">
-                    <div>📅 Ngày: <b>{p["session_date"]}</b></div>
-                    <div>🕐 Giờ: <b>{p["session_time"]}</b></div>
-                    <div>💪 PT: <b>{p["pt_name"]}</b></div>
-                    <div>🎫 Còn lại: <b style="color:var(--primary)">{left} buổi</b></div>
-                </div>
-                <div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> {p["content"]}</div>
-                {note_html}
-            </div>
-        """, unsafe_allow_html=True)
-        
-        col_ok, col_no, _ = st.columns([1, 1, 2])
+    for idx,p in enumerate(pending):
+        mid=p.get("membership_id","")
+        mem=next((m for m in st.session_state.memberships if m["id"]==mid),None)
+        left=sessions_remaining(mem) if mem else "?"
+        st.markdown(f'<div class="confirm-box"><div class="confirm-title">📋 Buổi tập #{idx+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem"><div>📅 Ngày: <b>{p["session_date"]}</b></div><div>🕐 Giờ: <b>{p["session_time"]}</b></div><div>💪 PT: <b>{p["pt_name"]}</b></div><div>🎫 Còn lại: <b style="color:var(--primary)">{left} buổi</b></div></div><div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> {p["content"]}</div>{f\'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>\' if p.get("note") else ""}</div>',unsafe_allow_html=True)
+        col_ok,col_no,_=st.columns([1,1,2])
         with col_ok:
-            if st.button(f"✅ Xác nhận", key=f"confirm_{p['id']}", use_container_width=True):
+            if st.button(f"✅ Xác nhận",key=f"confirm_{p['id']}",use_container_width=True):
                 for pp in st.session_state.pending_list:
-                    if pp["id"] == p["id"]: pp["status"] = "confirmed"
+                    if pp["id"]==p["id"]: pp["status"]="confirmed"
                 for m in st.session_state.memberships:
-                    if m["id"] == mid:
-                        m["sessions_done"] = m.get("sessions_done", 0) + 1
-                        if m["sessions_done"] >= m.get("sessions_total", 0): m["status"] = "completed"
-                st.session_state.sessions_log.append({"id": f"s{len(st.session_state.sessions_log)+1}", "membership_id": mid, "customer_id": cid, "pt_id": p["pt_id"], "session_date": p["session_date"], "session_time": p["session_time"], "content": p["content"], "note": p.get("note", ""), "weight": 0, "confirmed": True})
-                if db: db.collection("sessions").add({"membership_id": mid, "customer_id": cid, "session_date": p["session_date"], "content": p["content"], "confirmed": True, "confirmed_at": datetime.now().isoformat()})
+                    if m["id"]==mid:
+                        m["sessions_done"]=m.get("sessions_done",0)+1
+                        if m["sessions_done"]>=m.get("sessions_total",0): m["status"]="completed"
+                st.session_state.sessions_log.append({"id":f"s{len(st.session_state.sessions_log)+1}","membership_id":mid,"customer_id":cid,"pt_id":p["pt_id"],"session_date":p["session_date"],"session_time":p["session_time"],"content":p["content"],"note":p.get("note",""),"weight":0,"confirmed":True})
+                if db: db.collection("sessions").add({"membership_id":mid,"customer_id":cid,"session_date":p["session_date"],"content":p["content"],"confirmed":True,"confirmed_at":datetime.now().isoformat()})
                 st.success("✅ Đã xác nhận! Số buổi đã được cập nhật."); st.rerun()
         with col_no:
-            if st.button(f"❌ Từ chối", key=f"reject_{p['id']}", use_container_width=True):
+            if st.button(f"❌ Từ chối",key=f"reject_{p['id']}",use_container_width=True):
                 for pp in st.session_state.pending_list:
-                    if pp["id"] == p["id"]: pp["status"] = "rejected"
+                    if pp["id"]==p["id"]: pp["status"]="rejected"
                 st.warning("Đã từ chối buổi tập."); st.rerun()
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("<hr>",unsafe_allow_html=True)
 
 def page_my_sessions():
     st.markdown("# 📖 Nhật ký tập"); st.markdown("---")
-    cid = st.session_state.user.get("customer_id", "")
-    
-    # Sắp xếp các buổi tập theo ngày giảm dần
-    logs = sorted(
-        [s for s in st.session_state.sessions_log if s.get("customer_id") == cid and s.get("confirmed")],
-        key=lambda x: x.get("session_date", ""), 
-        reverse=True
-    )
-    
-    if not logs: 
-        st.info("Chưa có buổi tập nào được ghi nhận.")
-        return
-
+    cid=st.session_state.user.get("customer_id","")
+    logs=sorted([s for s in st.session_state.sessions_log if s.get("customer_id")==cid and s.get("confirmed")],key=lambda x:x.get("session_date",""),reverse=True)
+    if not logs: st.info("Chưa có buổi tập nào được ghi nhận."); return
     for s in logs:
-        # Sửa: Tách phần ghi chú tương tự để app không bị crash
-        s_note_html = ""
-        if s.get("note"):
-            s_note_html = f'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>'
+        st.markdown(f'<div class="card card-ok"><div style="display:flex;justify-content:space-between"><b>{s.get("session_date","")} – {s.get("session_time","")}</b><span class="badge b-active">Đã xác nhận</span></div><div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>{f\'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>\' if s.get("note") else ""}</div>',unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div class="card card-ok">
-                <div style="display:flex;justify-content:space-between">
-                    <b>{s.get("session_date","")} – {s.get("session_time","")}</b>
-                    <span class="badge b-active">Đã xác nhận</span>
-                </div>
-                <div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>
-                {s_note_html}
-            </div>
-        """, unsafe_allow_html=True)
-        
 def page_progress():
     st.markdown("# 📈 Kết quả & Tiến độ"); st.markdown("---")
     c1,c2=st.columns(2)

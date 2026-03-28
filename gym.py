@@ -18,10 +18,14 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
+
+/* Hiện Header để giữ nút mũi tên nhưng làm trong suốt để không lộ thanh trắng */
 header[data-testid="stHeader"] {
-    background: transparent !important;
-    color: white !important;
+    background-color: rgba(0,0,0,0) !important;
+    visibility: visible !important;
+    display: block !important;
 }
+
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}
 footer                           {display:none!important;}
@@ -76,22 +80,23 @@ html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!importa
     background: rgba(255,107,53,0.35) !important;
 }
 
-/* ── Nút mũi tên MO sidebar (ngoài màn hình khi sidebar đóng) ── */
+/* ── Nút mũi tên MỞ sidebar (khi đang đóng) ── */
 [data-testid="collapsedControl"] {
     display: block !important;
     visibility: visible !important;
     z-index: 100000 !important;
-    background: var(--primary) !important;
+    background: var(--primary) !important; /* Nền màu cam giống nút của bạn */
     border-radius: 0 8px 8px 0 !important;
-    padding: 6px 4px !important;
 }
+
 [data-testid="collapsedControl"] svg {
-    fill: white !important;
+    fill: white !important;   /* Đổi icon sang màu trắng */
     color: white !important;
-    stroke: white !important;
-    width: 32px !important;
-    height: 32px !important;
+    width: 28px !important;
+    height: 28px !important;
 }
+
+
 [data-testid="collapsedControl"]:hover {
     background: #e0552a !important;
 }

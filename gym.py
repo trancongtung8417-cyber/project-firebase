@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FitPro Manager",
     page_icon="🏋️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto", #"expanded"
     menu_items={}
 )
 
@@ -18,7 +18,7 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
-header[data-testid="stHeader"]  {display:none!important;}
+header[data-testid="stHeader"]  {display:block!important;background-color: transparent !important;}
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}
 footer                           {display:none!important;}
@@ -44,7 +44,23 @@ st.markdown("""
   --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.4);
 }
 html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!important;color:var(--text)!important;font-family:'Nunito',sans-serif!important;}
-[data-testid="stSidebar"]{background:var(--surface)!important;border-right:2px solid var(--surface2);}
+
+[data-testid="stSidebarCollapseButton"] {
+        display: block !important;
+        visibility: visible !important;
+        left: 10px !important; /* Vị trí nút bên trái */
+        top: 10px !important;  /* Vị trí nút phía trên */
+        z-index: 100000;
+    }
+[data-testid="stSidebarCollapseButton"] svg {
+        fill: white !important;
+        color: white !important;
+        width: 30px; /* Tăng kích thước cho dễ bấm trên điện thoại */
+        height: 30px;
+    }
+
+
+
 h1,h2,h3{font-family:'Bebas Neue',sans-serif!important;letter-spacing:1px;}
 h1{color:var(--primary)!important;font-size:2.2rem!important;}
 h2{color:var(--accent)!important;font-size:1.7rem!important;}

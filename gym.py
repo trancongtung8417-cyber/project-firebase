@@ -391,7 +391,20 @@ def page_confirm_session():
         mid=p.get("membership_id","")
         mem=next((m for m in st.session_state.memberships if m["id"]==mid),None)
         left=sessions_remaining(mem) if mem else "?"
-        st.markdown(f'<div class="confirm-box"><div class="confirm-title">📋 Buổi tập #{idx+1}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem"><div>📅 Ngày: <b>{p["session_date"]}</b></div><div>🕐 Giờ: <b>{p["session_time"]}</b></div><div>💪 PT: <b>{p["pt_name"]}</b></div><div>🎫 Còn lại: <b style="color:var(--primary)">{left} buổi</b></div></div><div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> {p["content"]}</div>{f\'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>\' if p.get("note") else ""}</div>',unsafe_allow_html=True)
+        _note_html = '<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: ' + p["note"] + '</div>' if p.get("note") else ""
+        _html = (
+            '<div class="confirm-box">'
+            '<div class="confirm-title">📋 Buổi tập #' + str(idx+1) + '</div>'
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:.6rem 0;font-size:.88rem">'
+            '<div>📅 Ngày: <b>' + p["session_date"] + '</b></div>'
+            '<div>🕐 Giờ: <b>' + p["session_time"] + '</b></div>'
+            '<div>💪 PT: <b>' + p["pt_name"] + '</b></div>'
+            '<div>🎫 Còn lại: <b style="color:var(--primary)">' + str(left) + ' buổi</b></div>'
+            '</div>'
+            '<div style="font-size:.88rem;margin:.4rem 0"><b>Nội dung:</b> ' + p["content"] + '</div>'
+            + _note_html + '</div>'
+        )
+        st.markdown(_html, unsafe_allow_html=True)
         col_ok,col_no,_=st.columns([1,1,2])
         with col_ok:
             if st.button(f"✅ Xác nhận",key=f"confirm_{p['id']}",use_container_width=True):
@@ -417,7 +430,15 @@ def page_my_sessions():
     logs=sorted([s for s in st.session_state.sessions_log if s.get("customer_id")==cid and s.get("confirmed")],key=lambda x:x.get("session_date",""),reverse=True)
     if not logs: st.info("Chưa có buổi tập nào được ghi nhận."); return
     for s in logs:
-        st.markdown(f'<div class="card card-ok"><div style="display:flex;justify-content:space-between"><b>{s.get("session_date","")} – {s.get("session_time","")}</b><span class="badge b-active">Đã xác nhận</span></div><div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>{f\'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>\' if s.get("note") else ""}</div>',unsafe_allow_html=True)
+        _note_s = '<div style="font-size:.8rem;color:var(--subtext)">📝 ' + s["note"] + '</div>' if s.get("note") else ""
+        st.markdown(
+            '<div class="card card-ok">'
+            '<div style="display:flex;justify-content:space-between">'
+            '<b>' + s.get("session_date","") + ' – ' + s.get("session_time","") + '</b>'
+            '<span class="badge b-active">Đã xác nhận</span></div>'
+            '<div style="margin:.4rem 0;font-size:.88rem">📋 ' + s.get("content","") + '</div>'
+            + _note_s + '</div>',
+            unsafe_allow_html=True)
 
 def page_progress():
     st.markdown("# 📈 Kết quả & Tiến độ"); st.markdown("---")

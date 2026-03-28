@@ -18,7 +18,7 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
-header[data-testid="stHeader"]  {display:none!important;}
+
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}
 footer                           {display:none!important;}
@@ -86,8 +86,8 @@ html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!importa
     fill: white !important;
     color: white !important;
     stroke: white !important;
-    width: 28px !important;
-    height: 28px !important;
+    width: 32px !important;
+    height: 32px !important;
 }
 [data-testid="collapsedControl"]:hover {
     background: #e0552a !important;

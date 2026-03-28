@@ -410,12 +410,37 @@ def page_confirm_session():
 
 def page_my_sessions():
     st.markdown("# 📖 Nhật ký tập"); st.markdown("---")
-    cid=st.session_state.user.get("customer_id","")
-    logs=sorted([s for s in st.session_state.sessions_log if s.get("customer_id")==cid and s.get("confirmed")],key=lambda x:x.get("session_date",""),reverse=True)
-    if not logs: st.info("Chưa có buổi tập nào được ghi nhận."); return
-    for s in logs:
-        st.markdown(f'<div class="card card-ok"><div style="display:flex;justify-content:space-between"><b>{s.get("session_date","")} – {s.get("session_time","")}</b><span class="badge b-active">Đã xác nhận</span></div><div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>{f\'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>\' if s.get("note") else ""}</div>',unsafe_allow_html=True)
+    cid = st.session_state.user.get("customer_id", "")
+    
+    # Sắp xếp các buổi tập theo ngày giảm dần
+    logs = sorted(
+        [s for s in st.session_state.sessions_log if s.get("customer_id") == cid and s.get("confirmed")],
+        key=lambda x: x.get("session_date", ""), 
+        reverse=True
+    )
+    
+    if not logs: 
+        st.info("Chưa có buổi tập nào được ghi nhận.")
+        return
 
+    for s in logs:
+        # 1. Xử lý phần ghi chú riêng biệt để tránh lỗi lồng f-string
+        note_html = ""
+        if s.get("note"):
+            note_html = f'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>'
+        
+        # 2. Sử dụng triple quotes (""") để viết HTML nhiều dòng cho dễ đọc
+        st.markdown(f"""
+            <div class="card card-ok">
+                <div style="display:flex;justify-content:space-between">
+                    <b>{s.get("session_date","")} – {s.get("session_time","")}</b>
+                    <span class="badge b-active">Đã xác nhận</span>
+                </div>
+                <div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>
+                {note_html}
+            </div>
+        """, unsafe_allow_html=True)
+        
 def page_progress():
     st.markdown("# 📈 Kết quả & Tiến độ"); st.markdown("---")
     c1,c2=st.columns(2)

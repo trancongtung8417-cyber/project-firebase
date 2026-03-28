@@ -18,7 +18,7 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
-header[data-testid="stHeader"]  {display:block!important;background-color: transparent !important;}
+header[data-testid="stHeader"]  {display:none!important;}
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}
 footer                           {display:none!important;}
@@ -45,19 +45,53 @@ st.markdown("""
 }
 html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!important;color:var(--text)!important;font-family:'Nunito',sans-serif!important;}
 
+/* ── Sidebar nền + border ── */
+[data-testid="stSidebar"] {
+    background: var(--surface) !important;
+    border-right: 2px solid var(--surface2) !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+    background: var(--surface) !important;
+}
+
+/* ── Nút mũi tên AN sidebar (trong sidebar khi mở) ── */
 [data-testid="stSidebarCollapseButton"] {
-        display: block !important;
-        visibility: visible !important;
-        left: 10px !important; /* Vị trí nút bên trái */
-        top: 10px !important;  /* Vị trí nút phía trên */
-        z-index: 100000;
-    }
+    display: block !important;
+    visibility: visible !important;
+    z-index: 100000 !important;
+    background: rgba(255,107,53,0.15) !important;
+    border-radius: 8px !important;
+}
 [data-testid="stSidebarCollapseButton"] svg {
-        fill: white !important;
-        color: white !important;
-        width: 30px; /* Tăng kích thước cho dễ bấm trên điện thoại */
-        height: 30px;
-    }
+    fill: white !important;
+    color: white !important;
+    stroke: white !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+[data-testid="stSidebarCollapseButton"]:hover {
+    background: rgba(255,107,53,0.35) !important;
+}
+
+/* ── Nút mũi tên MO sidebar (ngoài màn hình khi sidebar đóng) ── */
+[data-testid="collapsedControl"] {
+    display: block !important;
+    visibility: visible !important;
+    z-index: 100000 !important;
+    background: var(--primary) !important;
+    border-radius: 0 8px 8px 0 !important;
+    padding: 6px 4px !important;
+}
+[data-testid="collapsedControl"] svg {
+    fill: white !important;
+    color: white !important;
+    stroke: white !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background: #e0552a !important;
+}
 
 
 

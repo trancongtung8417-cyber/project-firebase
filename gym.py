@@ -19,12 +19,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* Hiện Header để giữ nút mũi tên nhưng làm trong suốt để không lộ thanh trắng */
-header[data-testid="stHeader"] {
-    background-color: rgba(0,0,0,0) !important;
-    visibility: visible !important;
-    display: block !important;
-}
+
 
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}

@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="FitPro Manager",
     page_icon="🏋️",
     layout="wide",
-    initial_sidebar_state="auto", #"expanded"
+    initial_sidebar_state="expanded", #"expanded"
     menu_items={}
 )
 

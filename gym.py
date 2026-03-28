@@ -87,38 +87,30 @@ LOGO_SVG = """<svg width="56" height="56" viewBox="0 0 60 60" fill="none" xmlns=
 @st.cache_resource
 def init_firebase():
     if not firebase_admin._apps:
-        try:
-            if "firebase" in st.secrets:
-                # Lấy dữ liệu từ secrets
-                fb = st.secrets["firebase"]
-                
-                # Tạo dict credential và xử lý ký tự xuống dòng của private_key
-                cred_dict = {
-                    "type": fb["type"],
-                    "project_id": fb["project_id"],
-                    "private_key_id": fb["private_key_id"],
-                    "private_key": fb["private_key"].replace("\\n", "\n"),
-                    "client_email": fb["client_email"],
-                    "client_id": fb["client_id"],
-                    "auth_uri": fb["auth_uri"],
-                    "token_uri": fb["token_uri"],
-                    "auth_provider_x509_cert_url": fb["auth_provider_x509_cert_url"],
-                    "client_x509_cert_url": fb["client_x509_cert_url"],
-                }
-                cred = credentials.Certificate(cred_dict)
-            else:
-                # Chạy ở local dùng file json
-                key_path = Path(__file__).parent / "serviceAccountKey.json"
-                if not key_path.exists():
-                    st.error("Không tìm thấy cấu hình Firebase (Secrets hoặc File JSON)!")
-                    return None
-                cred = credentials.Certificate(str(key_path))
+        if "firebase" in st.secrets:
+            fb = st.secrets["firebase"]
+            # Làm sạch khóa: Chuyển \n văn bản thành xuống dòng và xóa khoảng trắng thừa
+            raw_key = fb["private_key"]
+            clean_key = raw_key.replace("\\n", "\n").strip()
             
-            firebase_admin.initialize_app(cred)
-        except Exception as e:
-            st.error(f"Lỗi khởi tạo Firebase: {e}")
-            return None
-            
+            cred = credentials.Certificate({
+                "type": fb["type"],
+                "project_id": fb["project_id"],
+                "private_key_id": fb["private_key_id"],
+                "private_key": clean_key,
+                "client_email": fb["client_email"],
+                "client_id": fb["client_id"],
+                "auth_uri": fb["auth_uri"],
+                "token_uri": fb["token_uri"],
+                "auth_provider_x509_cert_url": fb["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": fb["client_x509_cert_url"],
+            })
+        else:
+            # Chạy local với file JSON
+            key_path = Path(__file__).parent / "serviceAccountKey.json"
+            if not key_path.exists(): return None
+            cred = credentials.Certificate(str(key_path))
+        firebase_admin.initialize_app(cred)
     return firestore.client()
 
 db = init_firebase()

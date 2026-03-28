@@ -18,7 +18,10 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
-
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    color: white !important;
+}
 #MainMenu                        {display:none!important;}
 .stDeployButton                  {display:none!important;}
 footer                           {display:none!important;}

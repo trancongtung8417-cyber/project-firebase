@@ -385,12 +385,11 @@ def page_confirm_session():
         mem = next((m for m in st.session_state.memberships if m["id"] == mid), None)
         left = sessions_remaining(mem) if mem else "?"
         
-        # SỬA TẠI ĐÂY: Tách phần ghi chú ra riêng để tránh lỗi lồng f-string
+        # Sửa: Tách phần ghi chú để tránh lỗi lồng f-string
         note_html = ""
         if p.get("note"):
             note_html = f'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>'
         
-        # Sử dụng dấu nháy ba (triple quotes) để chuỗi HTML sạch sẽ hơn
         st.markdown(f"""
             <div class="confirm-box">
                 <div class="confirm-title">📋 Buổi tập #{idx+1}</div>
@@ -440,12 +439,11 @@ def page_my_sessions():
         return
 
     for s in logs:
-        # 1. Xử lý phần ghi chú riêng biệt để tránh lỗi lồng f-string
-        note_html = ""
+        # Sửa: Tách phần ghi chú tương tự để app không bị crash
+        s_note_html = ""
         if s.get("note"):
-            note_html = f'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>'
-        
-        # 2. Sử dụng triple quotes (""") để viết HTML nhiều dòng cho dễ đọc
+            s_note_html = f'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>'
+
         st.markdown(f"""
             <div class="card card-ok">
                 <div style="display:flex;justify-content:space-between">
@@ -453,7 +451,7 @@ def page_my_sessions():
                     <span class="badge b-active">Đã xác nhận</span>
                 </div>
                 <div style="margin:.4rem 0;font-size:.88rem">📋 {s.get("content","")}</div>
-                {note_html}
+                {s_note_html}
             </div>
         """, unsafe_allow_html=True)
         

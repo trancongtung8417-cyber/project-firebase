@@ -40,12 +40,22 @@ button[data-testid="sidebar-toggle"] {
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800&display=swap');
+
 :root {
-  --primary:#FF6B35;--secondary:#1A1A2E;--accent:#FFD700;
-  --surface:#16213E;--surface2:#0F3460;--text:#E8E8E8;--subtext:#A0A0B0;
-  --success:#2ECC71;--warning:#F39C12;--danger:#E74C3C;
-  --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.4);
+  --primary: #FF6B35;
+  --secondary: #FFFFFF;    /* Nền ứng dụng màu trắng */
+  --accent: #FFD700;
+  --surface: #F8F9FA;      /* Màu nền card nhạt */
+  --surface2: #E9ECEF;     /* Màu border/vùng phụ */
+  --text: #2D3436;         /* Chữ màu tối để nổi trên nền trắng */
+  --subtext: #636E72;
+  --success: #27AE60;
+  --warning: #F39C12;
+  --danger: #D63031;
+  --radius: 12px;
+  --shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
+
 html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!important;color:var(--text)!important;font-family:'Nunito',sans-serif!important;}
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:2px solid var(--surface2);}
 h1,h2,h3{font-family:'Bebas Neue',sans-serif!important;letter-spacing:1px;}

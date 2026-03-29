@@ -14,52 +14,52 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* 1. ẨN CÁC THÀNH PHẦN HỆ THỨC (Dữ nguyên như cũ) */
+/* 1. KHÔI PHỤC NÚT SIDEBAR & LÀM NỔI BẬT */
 header[data-testid="stHeader"] { visibility: hidden; }
 #MainMenu, .stDeployButton, footer, [data-testid="stFooter"] { display:none !important; }
-.block-container { padding-top: 1rem !important; }
 
-/* 2. LÀM NỔI BẬT NÚT MỞ SIDEBAR (Cải tiến mạnh) */
-/* Chọn nút điều khiển sidebar */
 button[data-testid="sidebar-toggle"] {
-    /* Ép hiển thị và đưa lên lớp trên cùng */
     display: flex !important;
     visibility: visible !important;
     position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    z-index: 9999991 !important;
-    
-    /* Thiết kế hình tròn màu nổi bật */
-    background-color: #FF6B35 !important; /* Màu cam chính của app */
-    color: white !important; /* Màu mũi tên trắng */
-    border-radius: 50% !important; /* Bo tròn hoàn toàn */
-    
-    /* Tăng kích thước để dễ bấm trên điện thoại */
-    width: 45px !important;
-    height: 45px !important;
-    
-    /* Đổ bóng để tạo chiều sâu */
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
-    
-    /* Căn giữa icon bên trong */
-    justify-content: center !important;
-    align-items: center !important;
-    border: 2px solid rgba(255,255,255,0.2) !important;
+    top: 15px !important;
+    left: 15px !important;
+    z-index: 999999 !important;
+    background-color: #FF6B35 !important; /* Cam rực rỡ */
+    color: white !important;
+    border-radius: 50% !important;
+    width: 48px !important;
+    height: 48px !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important;
+}
+button[data-testid="sidebar-toggle"] svg { fill: white !important; }
+
+/* 2. ĐIỀU CHỈNH Ô NHẬP LIỆU (INPUT) ĐỂ DỄ NHÌN HƠN */
+.stTextInput input, .stTextArea textarea, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
+    background-color: #1e293b !important; /* Nền ô nhập sáng hơn nền web */
+    color: #ffffff !important; /* Chữ trắng rõ nét */
+    border: 1px solid #475569 !important; /* Viền xám sáng */
+    border-radius: 8px !important;
+    caret-color: #FF6B35 !important; /* CON TRỎ CHUỘT MÀU CAM - Cực kỳ dễ thấy */
+    font-size: 1rem !important;
 }
 
-/* Đảm bảo icon mũi tên bên trong cũng màu trắng */
-button[data-testid="sidebar-toggle"] svg {
-    fill: white !important;
-    width: 24px !important;
-    height: 24px !important;
+/* Hiệu ứng khi nhấn vào ô nhập liệu (Focus) */
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: #FF6B35 !important;
+    box-shadow: 0 0 0 2px rgba(255,107,53,0.2) !important;
+    background-color: #263345 !important;
 }
 
-/* Hiệu ứng khi di chuột hoặc bấm vào */
-button[data-testid="sidebar-toggle"]:hover {
-    background-color: #e0552a !important; /* Màu cam đậm hơn một chút */
-    transform: scale(1.05);
+/* 3. ĐIỀU CHỈNH LABEL (TÊN TRƯỜNG NHẬP LIỆU) */
+label[data-testid="stWidgetLabel"] p {
+    color: #E8E8E8 !important; /* Màu chữ tiêu đề sáng hơn */
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
 }
+
+/* 4. TỐI ƯU KHOẢNG CÁCH */
+.block-container { padding-top: 3.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 

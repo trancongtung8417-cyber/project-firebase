@@ -623,7 +623,6 @@ def page_customers_owner():
             if n_name and n_email and n_pwd:
                 if db: db.collection("users").add({"name":n_name,"email":n_email,"phone":n_phone,"password":n_pwd,"role":"customer","gender":n_gender,"dob":str(n_dob),"initial":{"weight":n_w,"height":n_h,"fat":n_f,"muscle":n_m},"note":n_note,"created_at":datetime.now().isoformat()})
                 st.success(f"✅ Đã thêm khách hàng {n_name}!")
-                st.rerun() # Chạy lại giao diện để hiển thị người mới
 
             else: st.error("Điền đầy đủ thông tin bắt buộc!")
 

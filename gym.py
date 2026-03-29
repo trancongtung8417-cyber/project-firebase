@@ -208,18 +208,38 @@ if "memberships" not in st.session_state:
 if "sessions_log" not in st.session_state:
     st.session_state.sessions_log=[s.copy() for s in MOCK_SESSIONS]
 
-def login(email,password):
+# def login(email,password):
+#     if db:
+#         for doc in db.collection("users").where("email","==",email).limit(1).stream():
+#             u=doc.to_dict()
+#             if u.get("password")==password:
+#                 st.session_state.logged_in=True
+#                 st.session_state.user={**u,"id":doc.id}
+#                 return True
+#         return False
+#     if email in MOCK_USERS and MOCK_USERS[email]["password"]==password:
+#         u=MOCK_USERS[email].copy();u["email"]=email
+#         st.session_state.logged_in=True;st.session_state.user=u;return True
+#     return False
+
+def login(email, password):
+    # 1. Kiểm tra trên Firebase trước (nếu có kết nối)
     if db:
-        for doc in db.collection("users").where("email","==",email).limit(1).stream():
-            u=doc.to_dict()
-            if u.get("password")==password:
-                st.session_state.logged_in=True
-                st.session_state.user={**u,"id":doc.id}
+        for doc in db.collection("users").where("email", "==", email).limit(1).stream():
+            u = doc.to_dict()
+            if u.get("password") == password:
+                st.session_state.logged_in = True
+                st.session_state.user = {**u, "id": doc.id}
                 return True
-        return False
-    if email in MOCK_USERS and MOCK_USERS[email]["password"]==password:
-        u=MOCK_USERS[email].copy();u["email"]=email
-        st.session_state.logged_in=True;st.session_state.user=u;return True
+    
+    # 2. Nếu không tìm thấy trên Firebase HOẶC kết nối Firebase lỗi, kiểm tra MOCK_USERS
+    if email in MOCK_USERS and MOCK_USERS[email]["password"] == password:
+        u = MOCK_USERS[email].copy()
+        u["email"] = email
+        st.session_state.logged_in = True
+        st.session_state.user = u
+        return True
+        
     return False
 
 def days_left(end_date_str):

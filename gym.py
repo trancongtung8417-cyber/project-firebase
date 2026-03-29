@@ -549,10 +549,30 @@ def page_pt_sessions():
             st.markdown(f'<div class="card card-warn"><div style="display:flex;justify-content:space-between"><b>👤 {p.get("customer_name","")}</b><span class="badge b-pending">Chờ KH xác nhận</span></div><div style="font-size:.83rem;color:var(--subtext)">📅 {p.get("session_date","")} {p.get("session_time","")}</div><div style="font-size:.85rem;margin-top:.3rem">📋 {p.get("content","")}</div></div>',unsafe_allow_html=True)
 
 def page_customers_owner():
+    
     st.markdown("# 👥 Quản lý Khách hàng"); st.markdown("---")
+    
+    # Lấy danh sách tên khách hàng duy nhất để làm bộ lọc
+    all_memberships = st.session_state.memberships
+    customer_names = sorted(list(set(m["customer_name"] for m in all_memberships)))
+    filter_options = ["Tất cả khách hàng"] + customer_names
+    
+    # Thêm dòng lựa chọn tên khách hàng
+    selected_customer = st.selectbox("🔍 Lọc theo tên khách hàng:", filter_options)
+
     tab1,tab2,tab3=st.tabs(["📋 Gói tập hiện có","🎫 Giao gói tập","➕ Thêm khách"])
+    
     with tab1:
-        for m in st.session_state.memberships: render_membership_card(m,show_customer=True,show_pt=True)
+        # Lọc dữ liệu dựa trên lựa chọn
+        display_list = all_memberships
+        if selected_customer != "Tất cả khách hàng":
+            display_list = [m for m in all_memberships if m["customer_name"] == selected_customer]
+            
+        if not display_list:
+            st.info("Không tìm thấy gói tập nào cho khách hàng này.")
+        for m in display_list: 
+            render_membership_card(m, show_customer=True, show_pt=True)
+
     with tab2:
         st.markdown("### 🎫 Giao gói tập cho khách hàng")
         st.markdown('<div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.3);border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem;font-size:.85rem">📌 <b>⏱ Theo thời gian:</b> Gym, Yoga... → cộng thêm ngày từ ngày mua<br>📌 <b>🏋️ Theo buổi PT:</b> Tập 1-1 với PT → PT ghi nhận, KH xác nhận từng buổi</div>',unsafe_allow_html=True)
@@ -663,10 +683,43 @@ def page_reports():
 
 def page_pts():
     st.markdown("# 🏋️ Quản lý Personal Trainer"); st.markdown("---")
+
+    # Dữ liệu PT (Nếu bạn dùng DB thì lấy từ db, ở đây ví dụ dựa trên mock data hiện có)
+    pt_list = [
+        {"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","exp":"3 năm","customers":2},
+        {"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","exp":"2 năm","customers":1}
+    ]
+    
+    pt_names = [pt["name"] for pt in pt_list]
+    filter_options = ["Tất cả PT"] + pt_names
+    
+    # Thêm dòng lựa chọn tên PT
+    selected_pt = st.selectbox("🔍 Lọc theo tên PT:", filter_options)
+
     tab1,tab2=st.tabs(["📋 Danh sách PT","➕ Thêm PT"])
+    
     with tab1:
-        for pt in [{"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","exp":"3 năm","customers":2},{"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","exp":"2 năm","customers":1}]:
-            st.markdown(f'<div class="card card-pt"><div style="display:flex;justify-content:space-between"><b>💪 {pt["name"]}</b><span class="badge b-active">Đang làm việc</span></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-top:.5rem;font-size:.82rem;color:var(--subtext)"><div>📧 {pt["email"]}</div><div>📱 {pt["phone"]}</div><div>⏱ {pt["exp"]}</div></div><div style="margin-top:.4rem;font-size:.83rem">🎯 {pt["specialty"]} | 👥 {pt["customers"]} khách hàng</div></div>',unsafe_allow_html=True)
+        # Lọc dữ liệu dựa trên lựa chọn
+        display_pts = pt_list
+        if selected_pt != "Tất cả PT":
+            display_pts = [pt for pt in pt_list if pt["name"] == selected_pt]
+            
+        for pt in display_pts:
+            st.markdown(f'''
+                <div class="card card-pt">
+                    <div style="display:flex;justify-content:space-between">
+                        <b>💪 {pt["name"]}</b>
+                        <span class="badge b-active">Đang làm việc</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-top:.5rem;font-size:.82rem;color:var(--subtext)">
+                        <div>📧 {pt["email"]}</div>
+                        <div>📱 {pt["phone"]}</div>
+                        <div>⏱ {pt["exp"]}</div>
+                    </div>
+                    <div style="margin-top:.4rem;font-size:.83rem">🎯 {pt["specialty"]} | 👥 {pt["customers"]} khách hàng</div>
+                </div>
+            ''', unsafe_allow_html=True)
+    
     with tab2:
         c1,c2=st.columns(2)
         with c1: p_name=st.text_input("Họ và tên PT *");p_email=st.text_input("Email *");p_phone=st.text_input("Số điện thoại");p_pwd=st.text_input("Mật khẩu *",type="password")

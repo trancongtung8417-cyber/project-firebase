@@ -14,15 +14,16 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-header[data-testid="stHeader"]   { display:none !important; }
-#MainMenu                         { display:none !important; }
-.stDeployButton                   { display:none !important; }
-footer                            { display:none !important; }
-[data-testid="stFooter"]         { display:none !important; }
-[data-testid="stToolbar"]        { display:none !important; }
-[data-testid="stDecoration"]     { display:none !important; }
-.viewerBadge_container__r5tak    { display:none !important; }
-.embeddedSocialProofIcon         { display:none !important; }
+/* Chỉ ẩn header và các nút không cần thiết, GIỮ LẠI sidebar */
+header[data-testid="stHeader"] { visibility: hidden; }
+#MainMenu { visibility: hidden; }
+.stDeployButton { display:none !important; }
+footer { display:none !important; }
+[data-testid="stFooter"] { display:none !important; }
+
+/* Quan trọng: Không sử dụng display:none cho stToolbar hoặc stDecoration 
+   vì đôi khi nó ảnh hưởng đến các thành phần điều hướng của Streamlit */
+
 .block-container { padding-top: 1rem !important; }
 </style>
 """, unsafe_allow_html=True)

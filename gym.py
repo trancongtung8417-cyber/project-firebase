@@ -18,22 +18,17 @@ st.set_page_config(
 # ═══════════════════════════════════════════════════
 st.markdown("""
 <style>
-
-/* Hiển thị Header nhưng làm trong suốt nền */
-header[data-testid="stHeader"] {
-    background-color: rgba(0,0,0,0) !important;
-    color: white !important;
-}
-
-#MainMenu                        {display:none!important;}
-.stDeployButton                  {display:none!important;}
-footer                           {display:none!important;}
-[data-testid="stFooter"]        {display:none!important;}
-[data-testid="stToolbar"]       {display:none!important;}
-[data-testid="stDecoration"]    {display:none!important;}
-.viewerBadge_container__r5tak   {display:none!important;}
-.embeddedSocialProofIcon        {display:none!important;}
-.block-container {padding-top:1rem!important;}
+/* Hide Streamlit default chrome */
+header[data-testid="stHeader"]  { display:none !important; }
+#MainMenu                        { display:none !important; }
+.stDeployButton                  { display:none !important; }
+footer                           { display:none !important; }
+[data-testid="stFooter"]        { display:none !important; }
+[data-testid="stToolbar"]       { display:none !important; }
+[data-testid="stDecoration"]    { display:none !important; }
+.viewerBadge_container__r5tak   { display:none !important; }
+.embeddedSocialProofIcon        { display:none !important; }
+.block-container                { padding-top: 0.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -51,52 +46,70 @@ st.markdown("""
 }
 html,body,[data-testid="stAppViewContainer"]{background:var(--secondary)!important;color:var(--text)!important;font-family:'Nunito',sans-serif!important;}
 
-/* ── Sidebar nền + border ── */
-[data-testid="stSidebar"] {
+/* ═══ SIDEBAR ═══ */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebar"] > div:first-child {
     background: var(--surface) !important;
     border-right: 2px solid var(--surface2) !important;
 }
-[data-testid="stSidebar"] > div:first-child {
-    background: var(--surface) !important;
-}
 
-/* ── Nút mũi tên AN sidebar (trong sidebar khi mở) ── */
-[data-testid="stSidebarCollapseButton"] {
-    display: block !important;
+/* Nút ẩn sidebar (mũi tên < trong sidebar) - TẤT CẢ phiên bản Streamlit */
+[data-testid="stSidebarCollapseButton"],
+button[kind="header"],
+.st-emotion-cache-1f3w014,
+.st-emotion-cache-czk5ss,
+[data-testid="baseButton-header"] {
+    display: flex !important;
     visibility: visible !important;
-    z-index: 100000 !important;
-    background: rgba(255,107,53,0.15) !important;
-    border-radius: 8px !important;
+    opacity: 1 !important;
+    z-index: 999999 !important;
 }
-[data-testid="stSidebarCollapseButton"] svg {
+[data-testid="stSidebarCollapseButton"] svg,
+button[kind="header"] svg,
+.st-emotion-cache-1f3w014 svg,
+.st-emotion-cache-czk5ss svg,
+[data-testid="baseButton-header"] svg {
     fill: white !important;
     color: white !important;
     stroke: white !important;
-    width: 28px !important;
-    height: 28px !important;
-}
-[data-testid="stSidebarCollapseButton"]:hover {
-    background: rgba(255,107,53,0.35) !important;
+    width: 26px !important;
+    height: 26px !important;
 }
 
-/* ── Nút mũi tên MỞ sidebar (khi đang đóng) ── */
-[data-testid="collapsedControl"] {
-    display: block !important;
+/* Nút mở sidebar (mũi tên > khi sidebar đóng) - TẤT CẢ phiên bản */
+[data-testid="collapsedControl"],
+.st-emotion-cache-1rtdyuf,
+.st-emotion-cache-6tkfeg,
+[data-testid="stSidebarOpenButton"],
+button[data-testid="stSidebarOpenButton"] {
+    display: flex !important;
     visibility: visible !important;
-    z-index: 100000 !important;
-    background: var(--primary) !important; /* Nền màu cam giống nút của bạn */
+    opacity: 1 !important;
+    z-index: 999999 !important;
+    background: var(--primary) !important;
     border-radius: 0 8px 8px 0 !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 8px 4px !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
 }
-
-[data-testid="collapsedControl"] svg {
-    fill: white !important;   /* Đổi icon sang màu trắng */
+[data-testid="collapsedControl"] svg,
+.st-emotion-cache-1rtdyuf svg,
+.st-emotion-cache-6tkfeg svg,
+[data-testid="stSidebarOpenButton"] svg,
+button[data-testid="stSidebarOpenButton"] svg {
+    fill: white !important;
     color: white !important;
-    width: 28px !important;
-    height: 28px !important;
+    stroke: white !important;
+    width: 26px !important;
+    height: 26px !important;
 }
-
-
-[data-testid="collapsedControl"]:hover {
+[data-testid="collapsedControl"]:hover,
+[data-testid="stSidebarOpenButton"]:hover {
     background: #e0552a !important;
 }
 
@@ -1046,6 +1059,50 @@ def main():
         return
 
     render_sidebar()
+
+    # ── JS: đảm bảo nút mở/đóng sidebar luôn hiển thị ──
+    st.markdown("""
+    <script>
+    (function() {
+        function fixSidebarBtn() {
+            // Tất cả các selector có thể có của nút toggle sidebar
+            var selectors = [
+                '[data-testid="collapsedControl"]',
+                '[data-testid="stSidebarCollapseButton"]',
+                '[data-testid="stSidebarOpenButton"]',
+                'button[kind="header"]',
+                '[data-testid="baseButton-header"]'
+            ];
+            selectors.forEach(function(sel) {
+                var els = document.querySelectorAll(sel);
+                els.forEach(function(el) {
+                    el.style.display = 'flex';
+                    el.style.visibility = 'visible';
+                    el.style.opacity = '1';
+                    el.style.zIndex = '999999';
+                    var svgs = el.querySelectorAll('svg, path');
+                    svgs.forEach(function(s) {
+                        s.style.fill = 'white';
+                        s.style.color = 'white';
+                        s.style.stroke = 'white';
+                    });
+                });
+            });
+        }
+        // Chạy ngay và sau mỗi 500ms trong 5 giây đầu
+        fixSidebarBtn();
+        var count = 0;
+        var iv = setInterval(function() {
+            fixSidebarBtn();
+            count++;
+            if (count > 10) clearInterval(iv);
+        }, 500);
+        // Theo dõi DOM thay đổi
+        var observer = new MutationObserver(fixSidebarBtn);
+        observer.observe(document.body, {childList: true, subtree: true});
+    })();
+    </script>
+    """, unsafe_allow_html=True)
 
     routes = {
         "dashboard":       page_dashboard,

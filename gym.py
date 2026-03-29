@@ -550,25 +550,15 @@ def page_pt_sessions():
 
 def page_customers_owner():
     
-    st.markdown("# 👥 Quản lý Khách hàng")
+    st.markdown("# 👥 Quản lý Khách hàng"); st.markdown("---")
     
-    # Luôn làm mới dữ liệu từ session_state
-    all_data = st.session_state.get('memberships', [])
+    # Lấy danh sách tên khách hàng duy nhất để làm bộ lọc
+    all_memberships = st.session_state.memberships
+    customer_names = sorted(list(set(m["customer_name"] for m in all_memberships)))
+    filter_options = ["Tất cả khách hàng"] + customer_names
     
-    if not all_data:
-        st.warning("Chưa có dữ liệu khách hàng nào trong hệ thống.")
-        return
-
-    # Bộ lọc tên khách hàng
-    customer_names = sorted(list(set(m.get("customer_name", "N/A") for m in all_data)))
-    selected_customer = st.selectbox("🔍 Lọc theo tên khách hàng:", ["Tất cả khách hàng"] + customer_names)
-
-    # Hiển thị
-    display_list = all_data if selected_customer == "Tất cả khách hàng" else \
-                   [m for m in all_data if m["customer_name"] == selected_customer]
-    
-    for m in display_list:
-        render_membership_card(m, show_customer=True, show_pt=True)
+    # Thêm dòng lựa chọn tên khách hàng
+    selected_customer = st.selectbox("🔍 Lọc theo tên khách hàng:", filter_options)
 
     tab1,tab2,tab3=st.tabs(["📋 Gói tập hiện có","🎫 Giao gói tập","➕ Thêm khách"])
     

@@ -43,11 +43,11 @@ st.markdown("""
 
 :root {
   --primary: #FF6B35;
-  --secondary: #FFFFFF;    /* Nền ứng dụng màu trắng */
+  --secondary: #FFFFFF;
   --accent: #FFD700;
-  --surface: #F8F9FA;      /* Màu nền card nhạt */
-  --surface2: #E9ECEF;     /* Màu border/vùng phụ */
-  --text: #2D3436;         /* Chữ màu tối để nổi trên nền trắng */
+  --surface: #F8F9FA;
+  --surface2: #E9ECEF;
+  --text: #2D3436;
   --subtext: #636E72;
   --success: #27AE60;
   --warning: #F39C12;
@@ -109,10 +109,8 @@ def init_firebase():
     if not firebase_admin._apps:
         if "firebase" in st.secrets:
             fb = st.secrets["firebase"]
-            # Làm sạch khóa: Chuyển \n văn bản thành xuống dòng và xóa khoảng trắng thừa
             raw_key = fb["private_key"]
             clean_key = raw_key.replace("\\n", "\n").strip()
-            
             cred = credentials.Certificate({
                 "type": fb["type"],
                 "project_id": fb["project_id"],
@@ -126,7 +124,6 @@ def init_firebase():
                 "client_x509_cert_url": fb["client_x509_cert_url"],
             })
         else:
-            # Chạy local với file JSON
             key_path = Path(__file__).parent / "serviceAccountKey.json"
             if not key_path.exists(): return None
             cred = credentials.Certificate(str(key_path))
@@ -135,16 +132,26 @@ def init_firebase():
 
 db = init_firebase()
 
+# ============================================================
+# FIX: load_data_from_firebase — đọc đủ users + memberships
+# ============================================================
 def load_data_from_firebase():
-    db = firestore.client()
-    
-    # Lấy danh sách Khách hàng/Gói tập
-    memberships_ref = db.collection("memberships").stream()
-    st.session_state.memberships = [doc.to_dict() for doc in memberships_ref]
-    
-    # Lấy danh sách PT
-    pts_ref = db.collection("users").where("role", "==", "PT").stream()
-    st.session_state.pts_list = [doc.to_dict() for doc in pts_ref]
+    if not db:
+        return
+    try:
+        # Load memberships
+        memberships_ref = db.collection("memberships").stream()
+        st.session_state.memberships = [{"id": doc.id, **doc.to_dict()} for doc in memberships_ref]
+
+        # FIX: query role chữ thường "pt" (trước là "PT" — sai)
+        pts_ref = db.collection("users").where("role", "==", "pt").stream()
+        st.session_state.pts_list = [{"id": doc.id, **doc.to_dict()} for doc in pts_ref]
+
+        # FIX: load customers — trước đây không có
+        customers_ref = db.collection("users").where("role", "==", "customer").stream()
+        st.session_state.customers_list = [{"id": doc.id, **doc.to_dict()} for doc in customers_ref]
+    except Exception as e:
+        st.warning(f"Lỗi tải dữ liệu Firebase: {e}")
 
 MOCK_USERS = {
     "owner@fitpro.vn": {"password":"owner123","role":"owner","name":"Chủ Phòng Gym"},
@@ -192,7 +199,8 @@ MOCK_SESSIONS = [
      "note":"","weight":75.0,"confirmed":True},
 ]
 
-for k,v in {"logged_in":False,"user":None,"page":"dashboard"}.items():
+# Khởi tạo session_state
+for k,v in {"logged_in":False,"user":None,"page":"dashboard","data_loaded":False}.items():
     if k not in st.session_state: st.session_state[k]=v
 if "pending_list" not in st.session_state:
     st.session_state.pending_list=[p.copy() for p in MOCK_PENDING]
@@ -200,39 +208,36 @@ if "memberships" not in st.session_state:
     st.session_state.memberships=[m.copy() for m in MOCK_MEMBERSHIPS]
 if "sessions_log" not in st.session_state:
     st.session_state.sessions_log=[s.copy() for s in MOCK_SESSIONS]
+# FIX: khởi tạo customers_list và pts_list
+if "customers_list" not in st.session_state:
+    st.session_state.customers_list = []
+if "pts_list" not in st.session_state:
+    st.session_state.pts_list = []
 
-# def login(email,password):
-#     if db:
-#         for doc in db.collection("users").where("email","==",email).limit(1).stream():
-#             u=doc.to_dict()
-#             if u.get("password")==password:
-#                 st.session_state.logged_in=True
-#                 st.session_state.user={**u,"id":doc.id}
-#                 return True
-#         return False
-#     if email in MOCK_USERS and MOCK_USERS[email]["password"]==password:
-#         u=MOCK_USERS[email].copy();u["email"]=email
-#         st.session_state.logged_in=True;st.session_state.user=u;return True
-#     return False
 def login(email, password):
-    # 1. Kiểm tra trên Firebase trước (nếu có kết nối)
     if db:
         for doc in db.collection("users").where("email", "==", email).limit(1).stream():
             u = doc.to_dict()
             if u.get("password") == password:
                 st.session_state.logged_in = True
                 st.session_state.user = {**u, "id": doc.id}
+                # FIX: load dữ liệu Firebase ngay sau khi login thành công
+                st.session_state.data_loaded = False
                 return True
-    
-    # 2. Nếu không tìm thấy trên Firebase HOẶC kết nối Firebase lỗi, kiểm tra MOCK_USERS
+
     if email in MOCK_USERS and MOCK_USERS[email]["password"] == password:
         u = MOCK_USERS[email].copy()
         u["email"] = email
         st.session_state.logged_in = True
         st.session_state.user = u
         return True
-        
+
     return False
+
+# FIX: Gọi load_data_from_firebase sau khi login, chỉ load 1 lần
+if db and st.session_state.get("logged_in") and not st.session_state.get("data_loaded"):
+    load_data_from_firebase()
+    st.session_state.data_loaded = True
 
 def days_left(end_date_str):
     try: return (date.fromisoformat(end_date_str)-date.today()).days
@@ -294,8 +299,17 @@ def render_sidebar():
             if st.button(f"{icon}  {label}{badge}",key=f"nav_{key}",use_container_width=True):
                 st.session_state.page=key;st.rerun()
         st.markdown("---")
+        # FIX: Nút reload dữ liệu Firebase
+        if db and st.button("🔄  Tải lại dữ liệu",use_container_width=True):
+            st.session_state.data_loaded = False
+            load_data_from_firebase()
+            st.session_state.data_loaded = True
+            st.success("Đã tải lại!")
+            st.rerun()
         if st.button("🚪  Đăng xuất",use_container_width=True):
-            st.session_state.logged_in=False;st.session_state.user=None;st.session_state.page="dashboard";st.rerun()
+            st.session_state.logged_in=False;st.session_state.user=None
+            st.session_state.page="dashboard";st.session_state.data_loaded=False
+            st.rerun()
 
 def page_login():
     c1,c2,c3=st.columns([1,1.1,1])
@@ -314,7 +328,6 @@ def page_login():
             💪 pt1@fitpro.vn / pt123 &nbsp;|&nbsp; pt2@fitpro.vn / pt456<br>
             🏃 khach1@gmail.com / kh123 &nbsp;|&nbsp; khach2@gmail.com / kh456
             </div>""",unsafe_allow_html=True)
-        
 
 def page_dashboard():
     user=st.session_state.user;role=user.get("role")
@@ -422,17 +435,16 @@ def page_confirm_session():
         st.markdown('<div class="card card-ok">Tất cả buổi tập đã được cập nhật!</div>',unsafe_allow_html=True)
         return
     st.markdown(f'<div style="background:rgba(243,156,18,.1);border:1px solid var(--warning);border-radius:10px;padding:.8rem 1rem;margin-bottom:1.2rem;font-size:.88rem">⚠️ Bạn có <b style="color:var(--warning)">{len(pending)} buổi tập</b> cần xác nhận. Sau khi xác nhận, số buổi sẽ tự động trừ.</div>',unsafe_allow_html=True)
-    
+
     for idx, p in enumerate(pending):
         mid = p.get("membership_id", "")
         mem = next((m for m in st.session_state.memberships if m["id"] == mid), None)
         left = sessions_remaining(mem) if mem else "?"
-        
-        # Sửa: Tách phần ghi chú để tránh lỗi lồng f-string
+
         note_html = ""
         if p.get("note"):
             note_html = f'<div style="font-size:.82rem;color:var(--subtext)">📝 PT ghi chú: {p["note"]}</div>'
-        
+
         st.markdown(f"""
             <div class="confirm-box">
                 <div class="confirm-title">📋 Buổi tập #{idx+1}</div>
@@ -446,7 +458,7 @@ def page_confirm_session():
                 {note_html}
             </div>
         """, unsafe_allow_html=True)
-        
+
         col_ok, col_no, _ = st.columns([1, 1, 2])
         with col_ok:
             if st.button(f"✅ Xác nhận", key=f"confirm_{p['id']}", use_container_width=True):
@@ -469,20 +481,18 @@ def page_confirm_session():
 def page_my_sessions():
     st.markdown("# 📖 Nhật ký tập"); st.markdown("---")
     cid = st.session_state.user.get("customer_id", "")
-    
-    # Sắp xếp các buổi tập theo ngày giảm dần
+
     logs = sorted(
         [s for s in st.session_state.sessions_log if s.get("customer_id") == cid and s.get("confirmed")],
-        key=lambda x: x.get("session_date", ""), 
+        key=lambda x: x.get("session_date", ""),
         reverse=True
     )
-    
-    if not logs: 
+
+    if not logs:
         st.info("Chưa có buổi tập nào được ghi nhận.")
         return
 
     for s in logs:
-        # Sửa: Tách phần ghi chú tương tự để app không bị crash
         s_note_html = ""
         if s.get("note"):
             s_note_html = f'<div style="font-size:.8rem;color:var(--subtext)">📝 {s["note"]}</div>'
@@ -561,29 +571,54 @@ def page_pt_sessions():
             st.markdown(f'<div class="card card-warn"><div style="display:flex;justify-content:space-between"><b>👤 {p.get("customer_name","")}</b><span class="badge b-pending">Chờ KH xác nhận</span></div><div style="font-size:.83rem;color:var(--subtext)">📅 {p.get("session_date","")} {p.get("session_time","")}</div><div style="font-size:.85rem;margin-top:.3rem">📋 {p.get("content","")}</div></div>',unsafe_allow_html=True)
 
 def page_customers_owner():
-    
     st.markdown("# 👥 Quản lý Khách hàng"); st.markdown("---")
-    
-    # Lấy danh sách tên khách hàng duy nhất để làm bộ lọc
+
     all_memberships = st.session_state.memberships
-    customer_names = sorted(list(set(m["customer_name"] for m in all_memberships)))
-    filter_options = ["Tất cả khách hàng"] + customer_names
-    
-    # Thêm dòng lựa chọn tên khách hàng
+
+    # FIX: Lấy danh sách khách từ customers_list (Firebase) thay vì từ memberships
+    all_customers = st.session_state.get("customers_list", [])
+
+    # Gộp tên từ cả 2 nguồn để không bỏ sót ai
+    names_from_memberships = [m["customer_name"] for m in all_memberships]
+    names_from_firebase = [c["name"] for c in all_customers]
+    all_names = sorted(list(set(names_from_memberships + names_from_firebase)))
+    filter_options = ["Tất cả khách hàng"] + all_names
+
     selected_customer = st.selectbox("🔍 Lọc theo tên khách hàng:", filter_options)
 
     tab1,tab2,tab3=st.tabs(["📋 Gói tập hiện có","🎫 Giao gói tập","➕ Thêm khách"])
-    
+
     with tab1:
-        # Lọc dữ liệu dựa trên lựa chọn
         display_list = all_memberships
         if selected_customer != "Tất cả khách hàng":
             display_list = [m for m in all_memberships if m["customer_name"] == selected_customer]
-            
+
         if not display_list:
             st.info("Không tìm thấy gói tập nào cho khách hàng này.")
-        for m in display_list: 
+        for m in display_list:
             render_membership_card(m, show_customer=True, show_pt=True)
+
+        # FIX: Hiển thị khách hàng mới chưa có gói tập
+        members_with_pkg = {m["customer_name"] for m in all_memberships}
+        new_customers = [c for c in all_customers if c.get("name","") not in members_with_pkg]
+        if new_customers:
+            if selected_customer == "Tất cả khách hàng" or selected_customer in [c.get("name","") for c in new_customers]:
+                st.markdown("#### 🆕 Khách hàng chưa có gói tập")
+                for c in new_customers:
+                    if selected_customer != "Tất cả khách hàng" and c.get("name","") != selected_customer:
+                        continue
+                    st.markdown(f'''
+                        <div class="card" style="border-left-color:#A78BFA">
+                            <div style="display:flex;justify-content:space-between">
+                                <b>👤 {c.get("name","")}</b>
+                                <span class="badge b-pending">Chưa có gói</span>
+                            </div>
+                            <div style="font-size:.82rem;color:var(--subtext);margin-top:.4rem">
+                                📧 {c.get("email","")} &nbsp;|&nbsp; 📱 {c.get("phone","")}
+                                &nbsp;|&nbsp; 🚻 {c.get("gender","")}
+                            </div>
+                        </div>
+                    ''', unsafe_allow_html=True)
 
     with tab2:
         st.markdown("### 🎫 Giao gói tập cho khách hàng")
@@ -596,6 +631,20 @@ def page_customers_owner():
         with c2:
             g_type=st.selectbox("Loại gói *",["⏱ Theo thời gian","🏋️ Theo buổi PT"])
             g_start=st.date_input("Ngày bắt đầu",value=date.today())
+
+        # FIX: Lấy danh sách PT từ Firebase (pts_list) để điền vào selectbox
+        pts_from_firebase = st.session_state.get("pts_list", [])
+        pt_options_map = {}
+        for pt in pts_from_firebase:
+            label = f"{pt.get('name','')} ({pt.get('id','')[:6]})"
+            pt_options_map[label] = (pt.get("id",""), pt.get("name",""))
+        # Fallback mock nếu Firebase chưa có PT nào
+        if not pt_options_map:
+            pt_options_map = {
+                "PT Nguyễn Văn A (pt1)": ("pt1","PT Nguyễn Văn A"),
+                "PT Trần Thị B (pt2)": ("pt2","PT Trần Thị B"),
+            }
+
         if "thời gian" in g_type:
             g_duration=st.selectbox("Thời hạn",["1 tháng (30 ngày)","3 tháng (90 ngày)","6 tháng (180 ngày)","1 năm (365 ngày)"])
             dur_map={"1 tháng (30 ngày)":30,"3 tháng (90 ngày)":90,"6 tháng (180 ngày)":180,"1 năm (365 ngày)":365}
@@ -603,9 +652,9 @@ def page_customers_owner():
             st.markdown(f'<div class="card card-time" style="padding:.7rem 1rem;font-size:.85rem">⏰ Ngày kết thúc: <b>{fmt_date(str(g_end))}</b> (sau {dur_days} ngày)</div>',unsafe_allow_html=True)
         else:
             g_sessions=st.number_input("Số buổi tập *",1,500,12)
-            g_pt=st.selectbox("Phân công PT *",["PT Nguyễn Văn A (pt1)","PT Trần Thị B (pt2)"])
-            pt_map={"PT Nguyễn Văn A (pt1)":("pt1","PT Nguyễn Văn A"),"PT Trần Thị B (pt2)":("pt2","PT Trần Thị B")}
-            pt_id_sel,pt_name_sel=pt_map[g_pt]
+            g_pt=st.selectbox("Phân công PT *", list(pt_options_map.keys()))
+            pt_id_sel, pt_name_sel = pt_options_map[g_pt]
+
         g_note=st.text_input("Ghi chú")
         if st.button("💾 Giao gói tập",use_container_width=True):
             if g_customer and g_pkg:
@@ -616,6 +665,7 @@ def page_customers_owner():
                 if db: db.collection("memberships").add(new_m)
                 st.success(f"✅ Đã giao gói '{g_pkg}' cho {g_customer}!"); st.rerun()
             else: st.error("Điền đầy đủ thông tin!")
+
     with tab3:
         st.markdown("### ➕ Thêm khách hàng mới")
         c1,c2=st.columns(2)
@@ -633,9 +683,20 @@ def page_customers_owner():
         with c4b: n_m=st.number_input("% Cơ",0.0,60.0,35.0)
         if st.button("💾 Thêm khách hàng",use_container_width=True):
             if n_name and n_email and n_pwd:
-                if db: db.collection("users").add({"name":n_name,"email":n_email,"phone":n_phone,"password":n_pwd,"role":"customer","gender":n_gender,"dob":str(n_dob),"initial":{"weight":n_w,"height":n_h,"fat":n_f,"muscle":n_m},"note":n_note,"created_at":datetime.now().isoformat()})
+                if db:
+                    db.collection("users").add({
+                        "name":n_name,"email":n_email,"phone":n_phone,"password":n_pwd,
+                        "role":"customer","gender":n_gender,"dob":str(n_dob),
+                        "initial":{"weight":n_w,"height":n_h,"fat":n_f,"muscle":n_m},
+                        "note":n_note,"created_at":datetime.now().isoformat()
+                    })
+                    # FIX: Cập nhật customers_list trong session_state ngay lập tức
+                    st.session_state.customers_list.append({
+                        "name":n_name,"email":n_email,"phone":n_phone,
+                        "role":"customer","gender":n_gender,"dob":str(n_dob),
+                    })
                 st.success(f"✅ Đã thêm khách hàng {n_name}!")
-
+                st.rerun()
             else: st.error("Điền đầy đủ thông tin bắt buộc!")
 
 def page_packages():
@@ -697,50 +758,72 @@ def page_reports():
 def page_pts():
     st.markdown("# 🏋️ Quản lý Personal Trainer"); st.markdown("---")
 
-    # Dữ liệu PT (Nếu bạn dùng DB thì lấy từ db, ở đây ví dụ dựa trên mock data hiện có)
-    pt_list = [
-        {"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","exp":"3 năm","customers":2},
-        {"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","exp":"2 năm","customers":1}
-    ]
-    
-    pt_names = [pt["name"] for pt in pt_list]
+    # FIX: Lấy PT từ Firebase (pts_list) thay vì hardcode
+    pt_list = st.session_state.get("pts_list", [])
+
+    # Fallback mock nếu Firebase chưa load được
+    if not pt_list:
+        pt_list = [
+            {"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","experience":"3 năm"},
+            {"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","experience":"2 năm"},
+        ]
+
+    # Tính số khách hàng của mỗi PT từ memberships
+    def count_customers(pt_name):
+        return len(set(
+            m["customer_id"] for m in st.session_state.memberships
+            if m.get("pt_name","") == pt_name or m.get("pt_name","") == f"PT {pt_name}"
+        ))
+
+    pt_names = [pt.get("name","") for pt in pt_list]
     filter_options = ["Tất cả PT"] + pt_names
-    
-    # Thêm dòng lựa chọn tên PT
     selected_pt = st.selectbox("🔍 Lọc theo tên PT:", filter_options)
 
     tab1,tab2=st.tabs(["📋 Danh sách PT","➕ Thêm PT"])
-    
+
     with tab1:
-        # Lọc dữ liệu dựa trên lựa chọn
         display_pts = pt_list
         if selected_pt != "Tất cả PT":
-            display_pts = [pt for pt in pt_list if pt["name"] == selected_pt]
-            
+            display_pts = [pt for pt in pt_list if pt.get("name","") == selected_pt]
+
+        if not display_pts:
+            st.info("Không tìm thấy PT nào.")
+
         for pt in display_pts:
+            n_customers = count_customers(pt.get("name",""))
             st.markdown(f'''
                 <div class="card card-pt">
                     <div style="display:flex;justify-content:space-between">
-                        <b>💪 {pt["name"]}</b>
+                        <b>💪 {pt.get("name","")}</b>
                         <span class="badge b-active">Đang làm việc</span>
                     </div>
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-top:.5rem;font-size:.82rem;color:var(--subtext)">
-                        <div>📧 {pt["email"]}</div>
-                        <div>📱 {pt["phone"]}</div>
-                        <div>⏱ {pt["exp"]}</div>
+                        <div>📧 {pt.get("email","")}</div>
+                        <div>📱 {pt.get("phone","")}</div>
+                        <div>⏱ {pt.get("experience","")}</div>
                     </div>
-                    <div style="margin-top:.4rem;font-size:.83rem">🎯 {pt["specialty"]} | 👥 {pt["customers"]} khách hàng</div>
+                    <div style="margin-top:.4rem;font-size:.83rem">🎯 {pt.get("specialty","")} | 👥 {n_customers} khách hàng</div>
                 </div>
             ''', unsafe_allow_html=True)
-    
+
     with tab2:
         c1,c2=st.columns(2)
         with c1: p_name=st.text_input("Họ và tên PT *");p_email=st.text_input("Email *");p_phone=st.text_input("Số điện thoại");p_pwd=st.text_input("Mật khẩu *",type="password")
         with c2: p_spec=st.text_input("Chuyên môn");p_exp=st.text_input("Kinh nghiệm");p_cert=st.text_area("Chứng chỉ")
         if st.button("💾 Thêm PT",use_container_width=True):
             if p_name and p_email and p_pwd:
-                if db: db.collection("users").add({"name":p_name,"email":p_email,"phone":p_phone,"password":p_pwd,"role":"pt","specialty":p_spec,"experience":p_exp,"certificates":p_cert})
+                if db:
+                    doc_ref = db.collection("users").add({
+                        "name":p_name,"email":p_email,"phone":p_phone,"password":p_pwd,
+                        "role":"pt","specialty":p_spec,"experience":p_exp,"certificates":p_cert
+                    })
+                    # FIX: Cập nhật pts_list trong session_state ngay lập tức
+                    st.session_state.pts_list.append({
+                        "name":p_name,"email":p_email,"phone":p_phone,
+                        "role":"pt","specialty":p_spec,"experience":p_exp,
+                    })
                 st.success(f"✅ Đã thêm PT {p_name}!")
+                st.rerun()
             else: st.error("Điền đầy đủ thông tin!")
 
 def main():

@@ -336,11 +336,20 @@ def page_dashboard():
     st.markdown("---")
     if role=="owner":
         all_m=st.session_state.memberships
+        all_customers=st.session_state.get("customers_list",[])
+        all_pts=st.session_state.get("pts_list",[])
         n_time=sum(1 for m in all_m if m["type"]=="time" and m["status"]=="active")
         n_sess=sum(1 for m in all_m if m["type"]=="session" and m["status"]=="active")
-        customers_set={m["customer_id"] for m in all_m if m["status"]=="active"}
+        # Tổng khách: ưu tiên customers_list Firebase, fallback từ memberships
+        n_customers=len(all_customers) if all_customers else len({m["customer_id"] for m in all_m})
+        n_pts=len(all_pts) if all_pts else 0
         c1,c2,c3,c4=st.columns(4)
-        for lbl,val,sub,col in [("Khách đang hoạt động",len(customers_set),"tổng cộng",c1),("Gói thời gian",n_time,"đang active",c2),("Gói buổi PT",n_sess,"đang active",c3),("Chờ xác nhận",len(st.session_state.pending_list),"buổi PT",c4)]:
+        for lbl,val,sub,col in [
+            ("Tổng số khách hàng",n_customers,"thành viên",c1),
+            ("Tổng số PT",n_pts,"huấn luyện viên",c2),
+            ("Tổng gói PT",n_sess,"đang active",c3),
+            ("Tổng gói thời gian",n_time,"đang active",c4),
+        ]:
             with col: st.markdown(f'<div class="mbox"><div class="val">{val}</div><div class="lbl">{lbl}</div><div class="sub">{sub}</div></div>',unsafe_allow_html=True)
         st.markdown("---")
         ca,cb=st.columns(2)
@@ -574,76 +583,165 @@ def page_customers_owner():
     st.markdown("# 👥 Quản lý Khách hàng"); st.markdown("---")
 
     all_memberships = st.session_state.memberships
-
-    # FIX: Lấy danh sách khách từ customers_list (Firebase) thay vì từ memberships
     all_customers = st.session_state.get("customers_list", [])
 
-    # Gộp tên từ cả 2 nguồn để không bỏ sót ai
+    # Gộp tên từ cả 2 nguồn
     names_from_memberships = [m["customer_name"] for m in all_memberships]
-    names_from_firebase = [c["name"] for c in all_customers]
+    names_from_firebase = [c.get("name","") for c in all_customers]
     all_names = sorted(list(set(names_from_memberships + names_from_firebase)))
-    filter_options = ["Tất cả khách hàng"] + all_names
 
-    selected_customer = st.selectbox("🔍 Lọc theo tên khách hàng:", filter_options)
+    tab1, tab2, tab3 = st.tabs(["👥 Danh sách khách hàng", "🎫 Giao gói tập", "➕ Thêm khách mới"])
 
-    tab1,tab2,tab3=st.tabs(["📋 Gói tập hiện có","🎫 Giao gói tập","➕ Thêm khách"])
-
+    # ── TAB 1: Danh sách & chi tiết khách hàng ──
     with tab1:
-        display_list = all_memberships
-        if selected_customer != "Tất cả khách hàng":
-            display_list = [m for m in all_memberships if m["customer_name"] == selected_customer]
+        col_search, col_add = st.columns([3,1])
+        with col_search:
+            selected_customer = st.selectbox("🔍 Chọn khách hàng để xem chi tiết:", ["-- Chọn khách hàng --"] + all_names)
 
-        if not display_list:
-            st.info("Không tìm thấy gói tập nào cho khách hàng này.")
-        for m in display_list:
-            render_membership_card(m, show_customer=True, show_pt=True)
+        if selected_customer != "-- Chọn khách hàng --":
+            # Tìm thông tin cá nhân từ customers_list
+            cust_info = next((c for c in all_customers if c.get("name","") == selected_customer), None)
+            cust_memberships = [m for m in all_memberships if m.get("customer_name","") == selected_customer]
 
-        # FIX: Hiển thị khách hàng mới chưa có gói tập
-        members_with_pkg = {m["customer_name"] for m in all_memberships}
-        new_customers = [c for c in all_customers if c.get("name","") not in members_with_pkg]
-        if new_customers:
-            if selected_customer == "Tất cả khách hàng" or selected_customer in [c.get("name","") for c in new_customers]:
-                st.markdown("#### 🆕 Khách hàng chưa có gói tập")
-                for c in new_customers:
-                    if selected_customer != "Tất cả khách hàng" and c.get("name","") != selected_customer:
-                        continue
-                    st.markdown(f'''
-                        <div class="card" style="border-left-color:#A78BFA">
-                            <div style="display:flex;justify-content:space-between">
-                                <b>👤 {c.get("name","")}</b>
-                                <span class="badge b-pending">Chưa có gói</span>
-                            </div>
-                            <div style="font-size:.82rem;color:var(--subtext);margin-top:.4rem">
-                                📧 {c.get("email","")} &nbsp;|&nbsp; 📱 {c.get("phone","")}
-                                &nbsp;|&nbsp; 🚻 {c.get("gender","")}
+            st.markdown(f"### 👤 {selected_customer}")
+
+            # --- Thông tin cá nhân ---
+            with st.expander("📋 Thông tin cá nhân", expanded=True):
+                if cust_info:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown(f"""
+                        <div class="card">
+                            <div style="font-size:.9rem;line-height:1.9">
+                                📱 <b>SĐT:</b> {cust_info.get("phone","—")}<br>
+                                🚻 <b>Giới tính:</b> {cust_info.get("gender","—")}<br>
+                                🎂 <b>Ngày sinh:</b> {fmt_date(cust_info.get("dob",""))}<br>
+                                📅 <b>Ngày đăng ký:</b> {fmt_date(cust_info.get("created_at","")[:10] if cust_info.get("created_at") else "")}
                             </div>
                         </div>
-                    ''', unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(f"""
+                        <div class="card">
+                            <div style="font-size:.9rem;line-height:1.9">
+                                📧 <b>Email:</b> {cust_info.get("email","—")}<br>
+                                🔑 <b>Mật khẩu:</b> {"•"*len(cust_info.get("password","")) if cust_info.get("password") else "—"}<br>
+                                📝 <b>Ghi chú:</b> {cust_info.get("note","—")}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("Không tìm thấy thông tin cá nhân trong hệ thống (khách từ gói tập).")
 
+            # --- Gói tập hiện có ---
+            if cust_memberships:
+                st.markdown("#### 🎫 Gói tập đang có")
+                for m in cust_memberships:
+                    render_membership_card(m, show_customer=False, show_pt=True)
+            else:
+                # Khách mới chưa có gói
+                st.markdown("""
+                <div class="card" style="border-left-color:#A78BFA;background:rgba(167,139,250,.08)">
+                    <span class="badge b-pending">🆕 Chưa có gói tập</span>
+                    <div style="margin-top:.6rem;font-size:.88rem;color:var(--subtext)">Khách hàng này chưa được giao gói tập nào. Hãy chọn gói tập phù hợp bên dưới.</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.markdown("**🎯 Giao gói tập nhanh:**")
+                pts_from_firebase = st.session_state.get("pts_list", [])
+                pt_options_map = {}
+                for pt in pts_from_firebase:
+                    label = f"{pt.get('name','')} ({pt.get('specialty','')})"
+                    pt_options_map[label] = (pt.get("id",""), pt.get("name",""))
+                if not pt_options_map:
+                    pt_options_map = {"PT Nguyễn Văn A (Cardio)": ("pt1","PT Nguyễn Văn A"), "PT Trần Thị B (Yoga)": ("pt2","PT Trần Thị B")}
+
+                qc1, qc2 = st.columns(2)
+                with qc1:
+                    q_pkg = st.text_input("Tên gói tập *", key=f"q_pkg_{selected_customer}")
+                    q_type = st.selectbox("Loại gói *", ["⏱ Theo thời gian", "🏋️ Theo buổi PT"], key=f"q_type_{selected_customer}")
+                with qc2:
+                    q_start = st.date_input("Ngày bắt đầu", value=date.today(), key=f"q_start_{selected_customer}")
+                    if "thời gian" in q_type:
+                        q_dur = st.selectbox("Thời hạn", ["1 tháng (30 ngày)","3 tháng (90 ngày)","6 tháng (180 ngày)"], key=f"q_dur_{selected_customer}")
+                        dur_map2={"1 tháng (30 ngày)":30,"3 tháng (90 ngày)":90,"6 tháng (180 ngày)":180}
+                        q_end = q_start + timedelta(days=dur_map2[q_dur])
+                    else:
+                        q_sess = st.number_input("Số buổi", 1, 500, 10, key=f"q_sess_{selected_customer}")
+                        q_pt = st.selectbox("Chọn PT *", list(pt_options_map.keys()), key=f"q_pt_{selected_customer}")
+                        q_pt_id, q_pt_name = pt_options_map[q_pt]
+
+                if st.button("💾 Giao gói tập ngay", key=f"q_assign_{selected_customer}", use_container_width=True):
+                    if q_pkg:
+                        cust_id = cust_info.get("id", f"kh_{selected_customer}") if cust_info else f"kh_{selected_customer}"
+                        new_m = {"id": f"m{len(st.session_state.memberships)+1}", "customer_id": cust_id, "customer_name": selected_customer, "package_name": q_pkg, "start_date": str(q_start), "status": "active", "notes": ""}
+                        if "thời gian" in q_type:
+                            new_m.update({"type":"time","end_date":str(q_end),"pt_id":None,"pt_name":None})
+                        else:
+                            new_m.update({"type":"session","sessions_total":q_sess,"sessions_done":0,"pt_id":q_pt_id,"pt_name":q_pt_name})
+                        st.session_state.memberships.append(new_m)
+                        if db: db.collection("memberships").add(new_m)
+                        st.success(f"✅ Đã giao gói '{q_pkg}' cho {selected_customer}!"); st.rerun()
+                    else:
+                        st.error("Vui lòng nhập tên gói tập!")
+
+            # --- Xóa khách hàng ---
+            st.markdown("---")
+            with st.expander("🗑️ Xóa khách hàng này", expanded=False):
+                st.markdown(f'<div class="confirm-box"><div class="confirm-title">⚠️ Xác nhận xóa khách hàng</div><div style="font-size:.88rem;margin-top:.5rem">Bạn sắp xóa <b>{selected_customer}</b> khỏi hệ thống. Hành động này không thể hoàn tác!</div></div>', unsafe_allow_html=True)
+                confirm_name = st.text_input("Nhập lại tên khách hàng để xác nhận xóa:", key=f"del_confirm_{selected_customer}")
+                if st.button("🗑️ Xác nhận xóa", key=f"del_btn_{selected_customer}", type="primary"):
+                    if confirm_name == selected_customer:
+                        # Xóa khỏi customers_list
+                        st.session_state.customers_list = [c for c in st.session_state.customers_list if c.get("name","") != selected_customer]
+                        # Xóa gói tập liên quan
+                        st.session_state.memberships = [m for m in st.session_state.memberships if m.get("customer_name","") != selected_customer]
+                        if db and cust_info and cust_info.get("id"):
+                            db.collection("users").document(cust_info["id"]).delete()
+                        st.success(f"✅ Đã xóa khách hàng {selected_customer}!"); st.rerun()
+                    else:
+                        st.error("Tên xác nhận không khớp! Vui lòng nhập đúng tên khách hàng.")
+        else:
+            # Hiển thị tất cả khách hàng dạng danh sách
+            st.markdown(f"#### 📋 Tổng số: {len(all_names)} khách hàng")
+            members_with_pkg = {m["customer_name"] for m in all_memberships}
+            for name in all_names:
+                cust_info2 = next((c for c in all_customers if c.get("name","") == name), None)
+                has_pkg = name in members_with_pkg
+                pkg_count = len([m for m in all_memberships if m["customer_name"] == name])
+                badge = f'<span class="badge b-active">{pkg_count} gói tập</span>' if has_pkg else '<span class="badge b-pending">Chưa có gói</span>'
+                phone = cust_info2.get("phone","—") if cust_info2 else "—"
+                gender = cust_info2.get("gender","—") if cust_info2 else "—"
+                st.markdown(f'''
+                    <div class="card">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <b>👤 {name}</b>{badge}
+                        </div>
+                        <div style="font-size:.82rem;color:var(--subtext);margin-top:.4rem">
+                            📱 {phone} &nbsp;|&nbsp; 🚻 {gender}
+                        </div>
+                    </div>
+                ''', unsafe_allow_html=True)
+
+    # ── TAB 2: Giao gói tập ──
     with tab2:
         st.markdown("### 🎫 Giao gói tập cho khách hàng")
         st.markdown('<div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.3);border-radius:10px;padding:.8rem 1rem;margin-bottom:1rem;font-size:.85rem">📌 <b>⏱ Theo thời gian:</b> Gym, Yoga... → cộng thêm ngày từ ngày mua<br>📌 <b>🏋️ Theo buổi PT:</b> Tập 1-1 với PT → PT ghi nhận, KH xác nhận từng buổi</div>',unsafe_allow_html=True)
         c1,c2=st.columns(2)
         with c1:
-            g_customer=st.text_input("Tên khách hàng *")
-            g_cid=st.text_input("Customer ID",placeholder="kh1, kh2...")
+            g_customer_sel = st.selectbox("Chọn khách hàng *", ["-- Chọn --"] + all_names, key="g_cust_sel")
+            g_customer = g_customer_sel if g_customer_sel != "-- Chọn --" else ""
             g_pkg=st.text_input("Tên gói tập *",placeholder="Gói Yoga 3 tháng")
         with c2:
             g_type=st.selectbox("Loại gói *",["⏱ Theo thời gian","🏋️ Theo buổi PT"])
             g_start=st.date_input("Ngày bắt đầu",value=date.today())
 
-        # FIX: Lấy danh sách PT từ Firebase (pts_list) để điền vào selectbox
         pts_from_firebase = st.session_state.get("pts_list", [])
         pt_options_map = {}
         for pt in pts_from_firebase:
             label = f"{pt.get('name','')} ({pt.get('id','')[:6]})"
             pt_options_map[label] = (pt.get("id",""), pt.get("name",""))
-        # Fallback mock nếu Firebase chưa có PT nào
         if not pt_options_map:
-            pt_options_map = {
-                "PT Nguyễn Văn A (pt1)": ("pt1","PT Nguyễn Văn A"),
-                "PT Trần Thị B (pt2)": ("pt2","PT Trần Thị B"),
-            }
+            pt_options_map = {"PT Nguyễn Văn A (pt1)": ("pt1","PT Nguyễn Văn A"), "PT Trần Thị B (pt2)": ("pt2","PT Trần Thị B")}
 
         if "thời gian" in g_type:
             g_duration=st.selectbox("Thời hạn",["1 tháng (30 ngày)","3 tháng (90 ngày)","6 tháng (180 ngày)","1 năm (365 ngày)"])
@@ -658,14 +756,17 @@ def page_customers_owner():
         g_note=st.text_input("Ghi chú")
         if st.button("💾 Giao gói tập",use_container_width=True):
             if g_customer and g_pkg:
-                new_m={"id":f"m{len(st.session_state.memberships)+1}","customer_id":g_cid or f"kh{len(st.session_state.memberships)+1}","customer_name":g_customer,"package_name":g_pkg,"start_date":str(g_start),"status":"active","notes":g_note}
+                cust_obj = next((c for c in all_customers if c.get("name","") == g_customer), None)
+                g_cid = cust_obj.get("id", f"kh{len(st.session_state.memberships)+1}") if cust_obj else f"kh{len(st.session_state.memberships)+1}"
+                new_m={"id":f"m{len(st.session_state.memberships)+1}","customer_id":g_cid,"customer_name":g_customer,"package_name":g_pkg,"start_date":str(g_start),"status":"active","notes":g_note}
                 if "thời gian" in g_type: new_m.update({"type":"time","end_date":str(g_end),"pt_id":None,"pt_name":None})
                 else: new_m.update({"type":"session","sessions_total":g_sessions,"sessions_done":0,"pt_id":pt_id_sel,"pt_name":pt_name_sel})
                 st.session_state.memberships.append(new_m)
                 if db: db.collection("memberships").add(new_m)
                 st.success(f"✅ Đã giao gói '{g_pkg}' cho {g_customer}!"); st.rerun()
-            else: st.error("Điền đầy đủ thông tin!")
+            else: st.error("Vui lòng chọn khách hàng và nhập tên gói tập!")
 
+    # ── TAB 3: Thêm khách hàng mới ──
     with tab3:
         st.markdown("### ➕ Thêm khách hàng mới")
         c1,c2=st.columns(2)
@@ -684,146 +785,421 @@ def page_customers_owner():
         if st.button("💾 Thêm khách hàng",use_container_width=True):
             if n_name and n_email and n_pwd:
                 if db:
-                    db.collection("users").add({
+                    doc_ref = db.collection("users").add({
                         "name":n_name,"email":n_email,"phone":n_phone,"password":n_pwd,
                         "role":"customer","gender":n_gender,"dob":str(n_dob),
                         "initial":{"weight":n_w,"height":n_h,"fat":n_f,"muscle":n_m},
                         "note":n_note,"created_at":datetime.now().isoformat()
                     })
-                    # FIX: Cập nhật customers_list trong session_state ngay lập tức
-                    st.session_state.customers_list.append({
-                        "name":n_name,"email":n_email,"phone":n_phone,
-                        "role":"customer","gender":n_gender,"dob":str(n_dob),
-                    })
-                st.success(f"✅ Đã thêm khách hàng {n_name}!")
-                st.rerun()
+                st.session_state.customers_list.append({
+                    "name":n_name,"email":n_email,"phone":n_phone,"password":n_pwd,
+                    "role":"customer","gender":n_gender,"dob":str(n_dob),
+                    "note":n_note,"created_at":datetime.now().isoformat()
+                })
+                st.success(f"✅ Đã thêm khách hàng {n_name}!"); st.rerun()
             else: st.error("Điền đầy đủ thông tin bắt buộc!")
 
 def page_packages():
     st.markdown("# 📦 Quản lý Gói tập"); st.markdown("---")
     st.markdown('<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem"><div class="card card-time" style="padding:1rem 1.2rem"><div style="font-family:\'Bebas Neue\';font-size:1.2rem;color:#A78BFA">⏱ GÓI THEO THỜI GIAN</div><div style="font-size:.85rem;margin:.4rem 0;color:var(--subtext)">Gym, yoga, zumba...<br>Tập tự do trong thời hạn<br>Hệ thống tính ngày kết thúc tự động</div></div><div class="card card-pt" style="padding:1rem 1.2rem"><div style="font-family:\'Bebas Neue\';font-size:1.2rem;color:#FF6B35">🏋️ GÓI THEO BUỔI PT</div><div style="font-size:.85rem;margin:.4rem 0;color:var(--subtext)">Tập 1-1 với Personal Trainer<br>PT ghi nhận → KH xác nhận → trừ buổi<br>Cả PT và KH thấy số buổi còn lại</div></div></div>',unsafe_allow_html=True)
-    tab1,tab2=st.tabs(["📋 Gói hiện có","➕ Tạo gói mới"])
+
+    all_m = st.session_state.memberships
+
+    # Custom packages trong session (tách khỏi memberships)
+    if "custom_packages" not in st.session_state:
+        st.session_state.custom_packages = [
+            {"id":"cp1","name":"Gói Gym Basic 1T","type":"time","price":800000,"duration":30,"note":"Tập tự do"},
+            {"id":"cp2","name":"Gói Yoga 3T","type":"time","price":2200000,"duration":90,"note":"Yoga & Zumba"},
+            {"id":"cp3","name":"Gói All-in-One 6T","type":"time","price":3800000,"duration":180,"note":"Tất cả dịch vụ"},
+            {"id":"cp4","name":"Gói PT Starter","type":"session","price":1500000,"sessions":10,"note":""},
+            {"id":"cp5","name":"Gói PT Premium","type":"session","price":3800000,"sessions":36,"note":""},
+            {"id":"cp6","name":"Gói PT VIP","type":"session","price":6500000,"sessions":72,"note":""},
+        ]
+
+    tab1, tab2, tab3 = st.tabs(["📋 Gói hiện có & Cảnh báo", "➕ Tạo gói mới", "🗑️ Xóa gói"])
+
     with tab1:
-        st.markdown("#### ⏱ Gói theo thời gian")
-        c1,c2,c3=st.columns(3)
-        for pkg,col in zip([("Gói Gym Basic 1T","800,000","30 ngày"),("Gói Yoga 3T","2,200,000","90 ngày"),("Gói All-in-One 6T","3,800,000","180 ngày")],[c1,c2,c3]):
-            with col: st.markdown(f'<div class="card card-time"><div style="font-family:\'Bebas Neue\';font-size:1.1rem;color:#A78BFA">{pkg[0]}</div><div style="font-size:1.4rem;font-weight:800;margin:.3rem 0">{pkg[1]}<span style="font-size:.75rem"> đ</span></div><div style="font-size:.82rem;color:var(--subtext)">🗓 {pkg[2]}</div></div>',unsafe_allow_html=True)
-        st.markdown("#### 🏋️ Gói theo buổi PT")
-        c1,c2,c3=st.columns(3)
-        for pkg,col in zip([("Gói PT Starter","1,500,000","10 buổi"),("Gói PT Premium","3,800,000","36 buổi"),("Gói PT VIP","6,500,000","72 buổi")],[c1,c2,c3]):
-            with col: st.markdown(f'<div class="card card-pt"><div style="font-family:\'Bebas Neue\';font-size:1.1rem;color:#FF6B35">{pkg[0]}</div><div style="font-size:1.4rem;font-weight:800;margin:.3rem 0">{pkg[1]}<span style="font-size:.75rem"> đ</span></div><div style="font-size:.82rem;color:var(--subtext)">🏋️ {pkg[2]}</div></div>',unsafe_allow_html=True)
+        # Cảnh báo gói sắp hết
+        warn_time = [m for m in all_m if m["type"]=="time" and days_left(m.get("end_date","")) is not None and 0 <= days_left(m.get("end_date","")) <= 14]
+        warn_sess = [m for m in all_m if m["type"]=="session" and 0 < sessions_remaining(m) <= 5]
+
+        if warn_time or warn_sess:
+            st.markdown("### ⚠️ Cảnh báo")
+            wc1, wc2 = st.columns(2)
+            with wc1:
+                st.markdown("**⏱ Gói thời gian sắp hết hiệu lực:**")
+                if warn_time:
+                    for m in warn_time:
+                        dl = days_left(m.get("end_date",""))
+                        color = "var(--danger)" if dl <= 7 else "var(--warning)"
+                        # Hiển thị tên KH nếu click vào gói
+                        st.markdown(f'<div class="card card-warn"><b>{m["package_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">👤 {m["customer_name"]}</span><span style="float:right;color:{color};font-weight:700">Còn {dl} ngày</span></div>', unsafe_allow_html=True)
+                else:
+                    st.info("Không có cảnh báo.")
+            with wc2:
+                st.markdown("**🏋️ Gói PT sắp hết buổi:**")
+                if warn_sess:
+                    for m in warn_sess:
+                        left = sessions_remaining(m)
+                        st.markdown(f'<div class="card card-warn"><b>{m["package_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">👤 {m["customer_name"]} | 💪 {m.get("pt_name","")}</span><span style="float:right;color:var(--warning);font-weight:700">Còn {left} buổi</span></div>', unsafe_allow_html=True)
+                else:
+                    st.info("Không có cảnh báo.")
+            st.markdown("---")
+
+        # Danh sách gói
+        st.markdown("### ⏱ Gói theo thời gian")
+        time_pkgs = [p for p in st.session_state.custom_packages if p["type"]=="time"]
+        if time_pkgs:
+            cols = st.columns(min(len(time_pkgs), 3))
+            for i, pkg in enumerate(time_pkgs):
+                # Đếm KH đang dùng gói này
+                users_on_pkg = [m["customer_name"] for m in all_m if m.get("package_name","") == pkg["name"] and m["status"]=="active"]
+                with cols[i % 3]:
+                    users_html = f'<div style="font-size:.75rem;color:var(--success);margin-top:.3rem">👥 {", ".join(users_on_pkg)}</div>' if users_on_pkg else ""
+                    st.markdown(f'<div class="card card-time"><div style="font-family:\'Bebas Neue\';font-size:1.1rem;color:#A78BFA">{pkg["name"]}</div><div style="font-size:1.4rem;font-weight:800;margin:.3rem 0">{pkg["price"]:,.0f}<span style="font-size:.75rem"> đ</span></div><div style="font-size:.82rem;color:var(--subtext)">🗓 {pkg["duration"]} ngày</div>{users_html}</div>', unsafe_allow_html=True)
+        else:
+            st.info("Chưa có gói thời gian nào.")
+
+        st.markdown("### 🏋️ Gói theo buổi PT")
+        sess_pkgs = [p for p in st.session_state.custom_packages if p["type"]=="session"]
+        if sess_pkgs:
+            cols2 = st.columns(min(len(sess_pkgs), 3))
+            for i, pkg in enumerate(sess_pkgs):
+                users_on_pkg2 = [m["customer_name"] for m in all_m if m.get("package_name","") == pkg["name"] and m["status"]=="active"]
+                with cols2[i % 3]:
+                    users_html2 = f'<div style="font-size:.75rem;color:var(--success);margin-top:.3rem">👥 {", ".join(users_on_pkg2)}</div>' if users_on_pkg2 else ""
+                    st.markdown(f'<div class="card card-pt"><div style="font-family:\'Bebas Neue\';font-size:1.1rem;color:#FF6B35">{pkg["name"]}</div><div style="font-size:1.4rem;font-weight:800;margin:.3rem 0">{pkg["price"]:,.0f}<span style="font-size:.75rem"> đ</span></div><div style="font-size:.82rem;color:var(--subtext)">🏋️ {pkg["sessions"]} buổi</div>{users_html2}</div>', unsafe_allow_html=True)
+        else:
+            st.info("Chưa có gói buổi PT nào.")
+
     with tab2:
-        c1,c2=st.columns(2)
+        c1, c2 = st.columns(2)
         with c1:
-            pg_name=st.text_input("Tên gói *");pg_price=st.number_input("Giá (VNĐ)",0,99999999,1000000,step=100000)
-            pg_type=st.selectbox("Loại gói",["⏱ Theo thời gian","🏋️ Theo buổi PT"])
+            pg_name = st.text_input("Tên gói *")
+            pg_price = st.number_input("Giá (VNĐ)", 0, 99999999, 1000000, step=100000)
+            pg_type = st.selectbox("Loại gói", ["⏱ Theo thời gian", "🏋️ Theo buổi PT"])
         with c2:
-            pg_dur=st.number_input("Thời hạn (ngày)",1,730,30) if "thời gian" in pg_type else None
-            pg_sess=st.number_input("Số buổi",1,500,10) if pg_dur is None else None
-            pg_note=st.text_area("Mô tả gói")
-        if st.button("💾 Tạo gói",use_container_width=True):
-            if pg_name: st.success(f"✅ Đã tạo gói '{pg_name}'!")
+            if "thời gian" in pg_type:
+                pg_dur = st.number_input("Thời hạn (ngày)", 1, 730, 30)
+                pg_sess = None
+            else:
+                pg_sess = st.number_input("Số buổi", 1, 500, 10)
+                pg_dur = None
+            pg_note = st.text_area("Mô tả gói")
+
+        if st.button("💾 Tạo gói", use_container_width=True):
+            if pg_name:
+                new_pkg = {"id": f"cp{len(st.session_state.custom_packages)+1}", "name": pg_name, "price": pg_price, "note": pg_note}
+                if pg_sess is None:
+                    new_pkg.update({"type":"time","duration":pg_dur})
+                else:
+                    new_pkg.update({"type":"session","sessions":pg_sess})
+                st.session_state.custom_packages.append(new_pkg)
+                st.success(f"✅ Đã tạo gói '{pg_name}'!"); st.rerun()
+            else:
+                st.error("Vui lòng nhập tên gói!")
+
+    with tab3:
+        st.markdown("### 🗑️ Xóa gói tập")
+        if not st.session_state.custom_packages:
+            st.info("Không có gói nào để xóa.")
+        else:
+            pkg_names = [p["name"] for p in st.session_state.custom_packages]
+            del_pkg = st.selectbox("Chọn gói cần xóa:", ["-- Chọn gói --"] + pkg_names)
+            if del_pkg != "-- Chọn gói --":
+                pkg_obj = next((p for p in st.session_state.custom_packages if p["name"] == del_pkg), None)
+                users_using = [m["customer_name"] for m in all_m if m.get("package_name","") == del_pkg and m["status"]=="active"]
+                if users_using:
+                    st.markdown(f'<div class="confirm-box"><div class="confirm-title">⚠️ Gói đang được sử dụng!</div><div style="font-size:.88rem;margin-top:.5rem">Gói <b>{del_pkg}</b> đang được dùng bởi: <b>{", ".join(users_using)}</b>.<br>Không thể xóa khi còn khách hàng đang sử dụng.</div></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="card" style="border-left-color:var(--danger)"><b>{del_pkg}</b> — Không có khách hàng đang sử dụng</div>', unsafe_allow_html=True)
+                    if st.button(f"🗑️ Xóa gói '{del_pkg}'", use_container_width=True):
+                        st.session_state.custom_packages = [p for p in st.session_state.custom_packages if p["name"] != del_pkg]
+                        st.success(f"✅ Đã xóa gói '{del_pkg}'!"); st.rerun()
 
 def page_reports():
     st.markdown("# 📈 Báo cáo & Thống kê"); st.markdown("---")
-    all_m=st.session_state.memberships
-    n_time=sum(1 for m in all_m if m["type"]=="time" and m["status"]=="active")
-    n_sess=sum(1 for m in all_m if m["type"]=="session" and m["status"]=="active")
-    total_done=sum(m.get("sessions_done",0) for m in all_m if m["type"]=="session")
-    c1,c2,c3,c4=st.columns(4)
-    for lbl,val,sub,col in [("Gói thời gian",n_time,"active",c1),("Gói buổi PT",n_sess,"active",c2),("Tổng buổi đã tập",total_done,"xác nhận",c3),("Chờ xác nhận",len(st.session_state.pending_list),"buổi PT",c4)]:
-        with col: st.markdown(f'<div class="mbox"><div class="val">{val}</div><div class="lbl">{lbl}</div><div class="sub">{sub}</div></div>',unsafe_allow_html=True)
-    st.markdown("---"); ca,cb=st.columns(2)
+    all_m = st.session_state.memberships
+    all_customers = st.session_state.get("customers_list", [])
+    all_pts = st.session_state.get("pts_list", [])
+
+    n_customers = len(all_customers) if all_customers else len({m["customer_id"] for m in all_m})
+    n_pts = len(all_pts)
+    n_time = sum(1 for m in all_m if m["type"]=="time" and m["status"]=="active")
+    n_sess = sum(1 for m in all_m if m["type"]=="session" and m["status"]=="active")
+
+    # Tổng quan
+    c1,c2,c3,c4 = st.columns(4)
+    for lbl,val,sub,col in [
+        ("Tổng số khách hàng", n_customers, "thành viên", c1),
+        ("Tổng số PT", n_pts, "huấn luyện viên", c2),
+        ("Tổng gói PT", n_sess, "đang active", c3),
+        ("Tổng gói thời gian", n_time, "đang active", c4),
+    ]:
+        with col: st.markdown(f'<div class="mbox"><div class="val">{val}</div><div class="lbl">{lbl}</div><div class="sub">{sub}</div></div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Bộ lọc thời gian
+    st.markdown("### 🗓️ Lọc theo thời gian")
+    filter_col1, filter_col2 = st.columns([2,3])
+    with filter_col1:
+        period = st.selectbox("Chọn kỳ báo cáo:", ["📅 Tuần này","📅 Tháng này","📅 Năm này","🗓️ Tùy chỉnh"])
+    with filter_col2:
+        today = date.today()
+        if "Tuần" in period:
+            start_filter = today - timedelta(days=today.weekday())
+            end_filter = start_filter + timedelta(days=6)
+        elif "Tháng" in period:
+            start_filter = today.replace(day=1)
+            end_filter = today
+        elif "Năm" in period:
+            start_filter = today.replace(month=1,day=1)
+            end_filter = today
+        else:
+            fc1, fc2 = st.columns(2)
+            with fc1: start_filter = st.date_input("Từ ngày", value=today.replace(day=1))
+            with fc2: end_filter = st.date_input("Đến ngày", value=today)
+        if "Tùy" not in period:
+            st.markdown(f'<div style="font-size:.85rem;color:var(--subtext);padding:.5rem 0">📆 {fmt_date(str(start_filter))} → {fmt_date(str(end_filter))}</div>', unsafe_allow_html=True)
+
+    # Lọc memberships theo thời gian
+    def in_range(m):
+        try:
+            sd = date.fromisoformat(m.get("start_date",""))
+            return start_filter <= sd <= end_filter
+        except: return False
+
+    filtered_m = [m for m in all_m if in_range(m)]
+    f_time = [m for m in filtered_m if m["type"]=="time"]
+    f_sess = [m for m in filtered_m if m["type"]=="session"]
+    total_done = sum(m.get("sessions_done",0) for m in filtered_m if m["type"]=="session")
+
+    st.markdown("#### 📊 Kết quả theo kỳ đã chọn")
+    r1,r2,r3,r4 = st.columns(4)
+    for lbl,val,col in [("Gói thời gian mới",len(f_time),r1),("Gói PT mới",len(f_sess),r2),("Tổng buổi đã tập",total_done,r3),("Tổng gói mới",len(filtered_m),r4)]:
+        with col: st.markdown(f'<div class="mbox"><div class="val">{val}</div><div class="lbl">{lbl}</div></div>',unsafe_allow_html=True)
+
+    st.markdown("---")
+    # Cảnh báo
+    ca, cb = st.columns(2)
     with ca:
         st.markdown("### 📦 Gói thời gian sắp hết (≤14 ngày)")
-        found=False
+        found = False
         for m in all_m:
             if m["type"]=="time":
-                dl=days_left(m.get("end_date",""))
+                dl = days_left(m.get("end_date",""))
                 if dl is not None and 0<=dl<=14:
-                    found=True;color="var(--danger)" if dl<=7 else "var(--warning)"
-                    st.markdown(f'<div class="card card-warn"><b>{m["customer_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">{m["package_name"]}</span><span style="float:right;color:{color};font-weight:700">Còn {dl} ngày</span></div>',unsafe_allow_html=True)
+                    found=True; color="var(--danger)" if dl<=7 else "var(--warning)"
+                    st.markdown(f'<div class="card card-warn"><b>{m["customer_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">{m["package_name"]}</span><span style="float:right;color:{color};font-weight:700">Còn {dl} ngày</span></div>', unsafe_allow_html=True)
         if not found: st.info("Không có gói nào sắp hết hạn.")
     with cb:
         st.markdown("### 🏋️ Gói PT sắp hết buổi (≤5 buổi)")
-        found2=False
+        found2 = False
         for m in all_m:
             if m["type"]=="session":
-                left=sessions_remaining(m)
+                left = sessions_remaining(m)
                 if 0<left<=5:
                     found2=True
-                    st.markdown(f'<div class="card card-warn"><b>{m["customer_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">{m["package_name"]}</span><span style="float:right;color:var(--warning);font-weight:700">Còn {left} buổi</span></div>',unsafe_allow_html=True)
+                    st.markdown(f'<div class="card card-warn"><b>{m["customer_name"]}</b><br><span style="font-size:.82rem;color:var(--subtext)">{m["package_name"]}</span><span style="float:right;color:var(--warning);font-weight:700">Còn {left} buổi</span></div>', unsafe_allow_html=True)
         if not found2: st.info("Không có gói nào sắp hết buổi.")
+
+    # Tải file Excel
+    st.markdown("---")
+    st.markdown("### 📥 Tải file tổng hợp")
+    dl_col1, dl_col2 = st.columns([2,2])
+    with dl_col1:
+        if st.button("📊 Tải báo cáo Excel", use_container_width=True):
+            try:
+                import io, openpyxl
+                from openpyxl.styles import Font, PatternFill, Alignment
+                wb = openpyxl.Workbook()
+                ws = wb.active; ws.title = "Báo cáo tổng hợp"
+                # Header
+                ws.append(["STT","Khách hàng","Gói tập","Loại gói","PT","Ngày bắt đầu","Ngày kết thúc / Số buổi","Trạng thái"])
+                for i, m in enumerate(all_m, 1):
+                    if m["type"]=="time":
+                        extra = m.get("end_date","")
+                    else:
+                        extra = f'{sessions_remaining(m)}/{m.get("sessions_total",0)} buổi còn lại'
+                    ws.append([i, m.get("customer_name",""), m.get("package_name",""),
+                                "Theo thời gian" if m["type"]=="time" else "Theo buổi PT",
+                                m.get("pt_name","—"), m.get("start_date",""), extra, m.get("status","")])
+                # Style header
+                for cell in ws[1]:
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(fill_type="solid", fgColor="FF6B35")
+                    cell.alignment = Alignment(horizontal="center")
+                for col in ws.columns:
+                    ws.column_dimensions[col[0].column_letter].width = 20
+                buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+                st.download_button("⬇️ Tải xuống file Excel", data=buf, file_name=f"baocao_fitpro_{today}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            except ImportError:
+                st.error("Cần cài openpyxl: pip install openpyxl")
 
 def page_pts():
     st.markdown("# 🏋️ Quản lý Personal Trainer"); st.markdown("---")
 
-    # FIX: Lấy PT từ Firebase (pts_list) thay vì hardcode
     pt_list = st.session_state.get("pts_list", [])
-
-    # Fallback mock nếu Firebase chưa load được
     if not pt_list:
         pt_list = [
-            {"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","experience":"3 năm"},
-            {"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","experience":"2 năm"},
+            {"name":"Nguyễn Văn A","email":"pt1@fitpro.vn","phone":"0934567890","specialty":"Cardio, Weight Loss","experience":"3 năm","gender":"Nam","created_at":"2024-01-01"},
+            {"name":"Trần Thị B","email":"pt2@fitpro.vn","phone":"0945678901","specialty":"Yoga, Muscle","experience":"2 năm","gender":"Nữ","created_at":"2024-03-15"},
         ]
 
-    # Tính số khách hàng của mỗi PT từ memberships
     def count_customers(pt_name):
-        return len(set(
-            m["customer_id"] for m in st.session_state.memberships
-            if m.get("pt_name","") == pt_name or m.get("pt_name","") == f"PT {pt_name}"
-        ))
+        return len(set(m["customer_id"] for m in st.session_state.memberships if m.get("pt_name","") == pt_name or m.get("pt_name","") == f"PT {pt_name}"))
 
     pt_names = [pt.get("name","") for pt in pt_list]
-    filter_options = ["Tất cả PT"] + pt_names
-    selected_pt = st.selectbox("🔍 Lọc theo tên PT:", filter_options)
-
-    tab1,tab2=st.tabs(["📋 Danh sách PT","➕ Thêm PT"])
+    tab1, tab2 = st.tabs(["📋 Danh sách PT", "➕ Thêm PT mới"])
 
     with tab1:
-        display_pts = pt_list
-        if selected_pt != "Tất cả PT":
-            display_pts = [pt for pt in pt_list if pt.get("name","") == selected_pt]
+        selected_pt = st.selectbox("🔍 Chọn PT để xem chi tiết:", ["-- Chọn PT --"] + pt_names)
 
-        if not display_pts:
-            st.info("Không tìm thấy PT nào.")
+        if selected_pt != "-- Chọn PT --":
+            pt_info = next((pt for pt in pt_list if pt.get("name","") == selected_pt), None)
+            pt_memberships = [m for m in st.session_state.memberships if m.get("pt_name","") == selected_pt or m.get("pt_name","") == f"PT {selected_pt}"]
 
-        for pt in display_pts:
-            n_customers = count_customers(pt.get("name",""))
-            st.markdown(f'''
-                <div class="card card-pt">
-                    <div style="display:flex;justify-content:space-between">
-                        <b>💪 {pt.get("name","")}</b>
-                        <span class="badge b-active">Đang làm việc</span>
+            st.markdown(f"### 💪 {selected_pt}")
+            n_cust = count_customers(selected_pt)
+
+            # --- Thông tin cá nhân ---
+            with st.expander("📋 Thông tin cá nhân", expanded=True):
+                if pt_info:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown(f"""
+                        <div class="card card-pt">
+                            <div style="font-size:.9rem;line-height:1.9">
+                                📱 <b>SĐT:</b> {pt_info.get("phone","—")}<br>
+                                🚻 <b>Giới tính:</b> {pt_info.get("gender","—")}<br>
+                                🎯 <b>Chuyên môn:</b> {pt_info.get("specialty","—")}<br>
+                                ⏱ <b>Kinh nghiệm:</b> {pt_info.get("experience","—")}<br>
+                                📅 <b>Ngày đăng ký:</b> {fmt_date(pt_info.get("created_at","")[:10] if pt_info.get("created_at") else "")}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(f"""
+                        <div class="card card-pt">
+                            <div style="font-size:.9rem;line-height:1.9">
+                                📧 <b>Email:</b> {pt_info.get("email","—")}<br>
+                                🔑 <b>Mật khẩu:</b> {"•"*len(pt_info.get("password","")) if pt_info.get("password") else "—"}<br>
+                                👥 <b>Số khách đang quản lý:</b> {n_cust}<br>
+                                🏆 <b>Chứng chỉ:</b> {pt_info.get("certificates","—")}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+            # --- Khách hàng của PT ---
+            if pt_memberships:
+                st.markdown("#### 👥 Khách hàng đang quản lý")
+                for m in pt_memberships:
+                    render_membership_card(m, show_customer=True, show_pt=False)
+            else:
+                st.info("PT này chưa được phân công khách hàng nào.")
+
+            # --- Chuyển PT ---
+            st.markdown("---")
+            with st.expander("🔄 Chuyển PT cho khách hàng", expanded=False):
+                st.markdown("Chọn khách hàng và PT mới để chuyển:")
+                other_pts = [pt.get("name","") for pt in pt_list if pt.get("name","") != selected_pt]
+                if pt_memberships and other_pts:
+                    transfer_customers = [m["customer_name"] for m in pt_memberships]
+                    tr_cust = st.selectbox("Chọn khách hàng cần chuyển:", transfer_customers, key=f"tr_cust_{selected_pt}")
+                    tr_pt = st.selectbox("Chuyển sang PT:", other_pts, key=f"tr_pt_{selected_pt}")
+                    tr_new_pt_id = next((pt.get("id","") for pt in pt_list if pt.get("name","") == tr_pt), tr_pt)
+                    if st.button("🔄 Xác nhận chuyển PT", key=f"tr_btn_{selected_pt}", use_container_width=True):
+                        for m in st.session_state.memberships:
+                            if m.get("customer_name","") == tr_cust and (m.get("pt_name","") == selected_pt or m.get("pt_name","") == f"PT {selected_pt}"):
+                                m["pt_name"] = tr_pt
+                                m["pt_id"] = tr_new_pt_id
+                        st.success(f"✅ Đã chuyển {tr_cust} sang PT {tr_pt}!"); st.rerun()
+                elif not other_pts:
+                    st.warning("Không có PT khác để chuyển. Vui lòng thêm PT mới trước.")
+                else:
+                    st.info("PT này chưa có khách hàng nào.")
+
+            # --- Xóa PT ---
+            st.markdown("---")
+            with st.expander("🗑️ Xóa PT này", expanded=False):
+                active_customers_of_pt = [m["customer_name"] for m in pt_memberships]
+                if active_customers_of_pt:
+                    st.markdown(f'<div class="confirm-box"><div class="confirm-title">⚠️ PT này đang có {len(active_customers_of_pt)} khách hàng!</div><div style="font-size:.88rem;margin-top:.5rem">Bạn phải chuyển tất cả khách hàng sang PT khác trước khi xóa PT <b>{selected_pt}</b>.</div></div>', unsafe_allow_html=True)
+                    other_pts2 = [pt.get("name","") for pt in pt_list if pt.get("name","") != selected_pt]
+                    if other_pts2:
+                        bulk_pt = st.selectbox("Chuyển tất cả khách sang PT:", other_pts2, key=f"bulk_pt_{selected_pt}")
+                        bulk_pt_id = next((pt.get("id","") for pt in pt_list if pt.get("name","") == bulk_pt), bulk_pt)
+                        confirm_del = st.text_input(f"Nhập tên PT '{selected_pt}' để xác nhận xóa sau khi chuyển:", key=f"del_pt_confirm_{selected_pt}")
+                        if st.button("🗑️ Chuyển PT & Xóa", key=f"del_pt_btn_{selected_pt}", type="primary"):
+                            if confirm_del == selected_pt:
+                                for m in st.session_state.memberships:
+                                    if m.get("pt_name","") == selected_pt or m.get("pt_name","") == f"PT {selected_pt}":
+                                        m["pt_name"] = bulk_pt; m["pt_id"] = bulk_pt_id
+                                st.session_state.pts_list = [pt for pt in st.session_state.pts_list if pt.get("name","") != selected_pt]
+                                if db and pt_info and pt_info.get("id"):
+                                    db.collection("users").document(pt_info["id"]).delete()
+                                st.success(f"✅ Đã chuyển khách sang {bulk_pt} và xóa PT {selected_pt}!"); st.rerun()
+                            else:
+                                st.error("Tên xác nhận không khớp!")
+                    else:
+                        st.error("Không có PT nào khác! Thêm PT mới trước khi xóa.")
+                else:
+                    confirm_del2 = st.text_input(f"Nhập tên PT '{selected_pt}' để xác nhận xóa:", key=f"del_pt_confirm2_{selected_pt}")
+                    if st.button("🗑️ Xác nhận xóa PT", key=f"del_pt_btn2_{selected_pt}", type="primary"):
+                        if confirm_del2 == selected_pt:
+                            st.session_state.pts_list = [pt for pt in st.session_state.pts_list if pt.get("name","") != selected_pt]
+                            if db and pt_info and pt_info.get("id"):
+                                db.collection("users").document(pt_info["id"]).delete()
+                            st.success(f"✅ Đã xóa PT {selected_pt}!"); st.rerun()
+                        else:
+                            st.error("Tên xác nhận không khớp!")
+        else:
+            # Hiển thị danh sách tất cả PT
+            st.markdown(f"#### 📋 Tổng số: {len(pt_list)} PT")
+            for pt in pt_list:
+                n_customers = count_customers(pt.get("name",""))
+                st.markdown(f'''
+                    <div class="card card-pt">
+                        <div style="display:flex;justify-content:space-between">
+                            <b>💪 {pt.get("name","")}</b>
+                            <span class="badge b-active">Đang làm việc</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-top:.5rem;font-size:.82rem;color:var(--subtext)">
+                            <div>📧 {pt.get("email","")}</div>
+                            <div>📱 {pt.get("phone","")}</div>
+                            <div>⏱ {pt.get("experience","")}</div>
+                        </div>
+                        <div style="margin-top:.4rem;font-size:.83rem">🎯 {pt.get("specialty","")} &nbsp;|&nbsp; 👥 {n_customers} khách hàng</div>
                     </div>
-                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.3rem;margin-top:.5rem;font-size:.82rem;color:var(--subtext)">
-                        <div>📧 {pt.get("email","")}</div>
-                        <div>📱 {pt.get("phone","")}</div>
-                        <div>⏱ {pt.get("experience","")}</div>
-                    </div>
-                    <div style="margin-top:.4rem;font-size:.83rem">🎯 {pt.get("specialty","")} | 👥 {n_customers} khách hàng</div>
-                </div>
-            ''', unsafe_allow_html=True)
+                ''', unsafe_allow_html=True)
 
     with tab2:
         c1,c2=st.columns(2)
-        with c1: p_name=st.text_input("Họ và tên PT *");p_email=st.text_input("Email *");p_phone=st.text_input("Số điện thoại");p_pwd=st.text_input("Mật khẩu *",type="password")
-        with c2: p_spec=st.text_input("Chuyên môn");p_exp=st.text_input("Kinh nghiệm");p_cert=st.text_area("Chứng chỉ")
+        with c1:
+            p_name=st.text_input("Họ và tên PT *")
+            p_email=st.text_input("Email *")
+            p_phone=st.text_input("Số điện thoại")
+            p_pwd=st.text_input("Mật khẩu *",type="password")
+            p_gender=st.selectbox("Giới tính",["Nam","Nữ","Khác"])
+        with c2:
+            p_spec=st.text_input("Chuyên môn")
+            p_exp=st.text_input("Kinh nghiệm")
+            p_cert=st.text_area("Chứng chỉ")
         if st.button("💾 Thêm PT",use_container_width=True):
             if p_name and p_email and p_pwd:
                 if db:
                     doc_ref = db.collection("users").add({
                         "name":p_name,"email":p_email,"phone":p_phone,"password":p_pwd,
-                        "role":"pt","specialty":p_spec,"experience":p_exp,"certificates":p_cert
+                        "role":"pt","specialty":p_spec,"experience":p_exp,"certificates":p_cert,
+                        "gender":p_gender,"created_at":datetime.now().isoformat()
                     })
-                    # FIX: Cập nhật pts_list trong session_state ngay lập tức
-                    st.session_state.pts_list.append({
-                        "name":p_name,"email":p_email,"phone":p_phone,
-                        "role":"pt","specialty":p_spec,"experience":p_exp,
-                    })
-                st.success(f"✅ Đã thêm PT {p_name}!")
-                st.rerun()
+                st.session_state.pts_list.append({
+                    "name":p_name,"email":p_email,"phone":p_phone,"password":p_pwd,
+                    "role":"pt","specialty":p_spec,"experience":p_exp,"gender":p_gender,
+                    "created_at":datetime.now().isoformat()
+                })
+                st.success(f"✅ Đã thêm PT {p_name}!"); st.rerun()
             else: st.error("Điền đầy đủ thông tin!")
 
 def main():

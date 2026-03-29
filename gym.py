@@ -14,52 +14,26 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* 1. ẨN CÁC THÀNH PHẦN HỆ THỨC (Dữ nguyên như cũ) */
-header[data-testid="stHeader"] { visibility: hidden; }
-#MainMenu, .stDeployButton, footer, [data-testid="stFooter"] { display:none !important; }
-.block-container { padding-top: 1rem !important; }
-
-/* 2. LÀM NỔI BẬT NÚT MỞ SIDEBAR (Cải tiến mạnh) */
-/* Chọn nút điều khiển sidebar */
+/* 1. Ẩn các thành phần thừa nhưng GIỮ LẠI NÚT SIDEBAR */
+header[data-testid="stHeader"] { 
+    background-color: rgba(0,0,0,0) !important;
+    color: white !important;
+}
+/* Hiển thị lại nút đóng/mở Sidebar và làm nó nổi bật */
 button[data-testid="sidebar-toggle"] {
-    /* Ép hiển thị và đưa lên lớp trên cùng */
-    display: flex !important;
+    background-color: var(--primary) !important;
+    color: white !important;
+    display: block !important;
+}
+
+/* 2. Chặn việc ẩn Sidebar trên màn hình nhỏ */
+[data-testid="stSidebar"] {
+    display: block !important;
     visibility: visible !important;
-    position: fixed !important;
-    top: 10px !important;
-    left: 10px !important;
-    z-index: 9999991 !important;
-    
-    /* Thiết kế hình tròn màu nổi bật */
-    background-color: #FF6B35 !important; /* Màu cam chính của app */
-    color: white !important; /* Màu mũi tên trắng */
-    border-radius: 50% !important; /* Bo tròn hoàn toàn */
-    
-    /* Tăng kích thước để dễ bấm trên điện thoại */
-    width: 45px !important;
-    height: 45px !important;
-    
-    /* Đổ bóng để tạo chiều sâu */
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
-    
-    /* Căn giữa icon bên trong */
-    justify-content: center !important;
-    align-items: center !important;
-    border: 2px solid rgba(255,255,255,0.2) !important;
 }
 
-/* Đảm bảo icon mũi tên bên trong cũng màu trắng */
-button[data-testid="sidebar-toggle"] svg {
-    fill: white !important;
-    width: 24px !important;
-    height: 24px !important;
-}
-
-/* Hiệu ứng khi di chuột hoặc bấm vào */
-button[data-testid="sidebar-toggle"]:hover {
-    background-color: #e0552a !important; /* Màu cam đậm hơn một chút */
-    transform: scale(1.05);
-}
+#MainMenu, .stDeployButton, footer, [data-testid="stFooter"] { display:none !important; }
+.block-container { padding-top: 2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 

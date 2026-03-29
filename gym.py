@@ -550,7 +550,7 @@ def page_pt_sessions():
 
 def page_customers_owner():
     
-    st.markdown("# 👥 Quản lý Khách hàng"); st.markdown("---")
+    st.markdown("# 👥 Quản lý Khách hàng")
     
     # Luôn làm mới dữ liệu từ session_state
     all_data = st.session_state.get('memberships', [])

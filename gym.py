@@ -135,6 +135,17 @@ def init_firebase():
 
 db = init_firebase()
 
+def load_data_from_firebase():
+    db = firestore.client()
+    
+    # Lấy danh sách Khách hàng/Gói tập
+    memberships_ref = db.collection("memberships").stream()
+    st.session_state.memberships = [doc.to_dict() for doc in memberships_ref]
+    
+    # Lấy danh sách PT
+    pts_ref = db.collection("users").where("role", "==", "PT").stream()
+    st.session_state.pts_list = [doc.to_dict() for doc in pts_ref]
+
 MOCK_USERS = {
     "owner@fitpro.vn": {"password":"owner123","role":"owner","name":"Chủ Phòng Gym"},
     "pt1@fitpro.vn":   {"password":"123","role":"pt","name":"Nguyễn Văn A","pt_id":"pt1"},
@@ -303,6 +314,7 @@ def page_login():
             💪 pt1@fitpro.vn / pt123 &nbsp;|&nbsp; pt2@fitpro.vn / pt456<br>
             🏃 khach1@gmail.com / kh123 &nbsp;|&nbsp; khach2@gmail.com / kh456
             </div>""",unsafe_allow_html=True)
+        
 
 def page_dashboard():
     user=st.session_state.user;role=user.get("role")

@@ -14,17 +14,26 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* Chỉ ẩn header và các nút không cần thiết, GIỮ LẠI sidebar */
-header[data-testid="stHeader"] { visibility: hidden; }
-#MainMenu { visibility: hidden; }
-.stDeployButton { display:none !important; }
-footer { display:none !important; }
-[data-testid="stFooter"] { display:none !important; }
+/* 1. Ẩn các thành phần thừa nhưng GIỮ LẠI NÚT SIDEBAR */
+header[data-testid="stHeader"] { 
+    background-color: rgba(0,0,0,0) !important;
+    color: white !important;
+}
+/* Hiển thị lại nút đóng/mở Sidebar và làm nó nổi bật */
+button[data-testid="sidebar-toggle"] {
+    background-color: var(--primary) !important;
+    color: white !important;
+    display: block !important;
+}
 
-/* Quan trọng: Không sử dụng display:none cho stToolbar hoặc stDecoration 
-   vì đôi khi nó ảnh hưởng đến các thành phần điều hướng của Streamlit */
+/* 2. Chặn việc ẩn Sidebar trên màn hình nhỏ */
+[data-testid="stSidebar"] {
+    display: block !important;
+    visibility: visible !important;
+}
 
-.block-container { padding-top: 1rem !important; }
+#MainMenu, .stDeployButton, footer, [data-testid="stFooter"] { display:none !important; }
+.block-container { padding-top: 2rem !important; }
 </style>
 """, unsafe_allow_html=True)
 

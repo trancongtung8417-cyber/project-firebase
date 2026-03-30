@@ -796,7 +796,8 @@ def page_customers_owner():
                     "role":"customer","gender":n_gender,"dob":str(n_dob),
                     "note":n_note,"created_at":datetime.now().isoformat()
                 })
-                st.success(f"✅ Đã thêm khách hàng {n_name}!"); st.rerun()
+                st.success(f"✅ Đã thêm khách hàng {n_name}!")
+                st.rerun()
             else: st.error("Điền đầy đủ thông tin bắt buộc!")
 
 def page_packages():

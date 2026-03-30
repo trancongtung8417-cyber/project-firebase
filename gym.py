@@ -306,6 +306,7 @@ def render_sidebar():
             load_data_from_firebase()
             st.session_state.data_loaded = True
             st.success("Đã tải lại!")
+            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
             st.rerun()
         if st.button("🚪  Đăng xuất",use_container_width=True):
             st.session_state.logged_in=False;st.session_state.user=None
@@ -320,7 +321,9 @@ def page_login():
         email=st.text_input("Email",placeholder="email@fitpro.vn")
         password=st.text_input("Mật khẩu",type="password",placeholder="••••••••")
         if st.button("Đăng nhập",use_container_width=True):
-            if login(email,password): st.success("Đăng nhập thành công!"); st.rerun()
+            if login(email,password): st.success("Đăng nhập thành công!") 
+            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+            st.rerun()
             else: st.error("Sai email hoặc mật khẩu!")
         if not db:
             st.markdown("""<div style="background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.3);border-radius:10px;padding:1rem;margin-top:1rem;font-size:.8rem">
@@ -480,7 +483,9 @@ def page_confirm_session():
                         if m["sessions_done"] >= m.get("sessions_total", 0): m["status"] = "completed"
                 st.session_state.sessions_log.append({"id": f"s{len(st.session_state.sessions_log)+1}", "membership_id": mid, "customer_id": cid, "pt_id": p["pt_id"], "session_date": p["session_date"], "session_time": p["session_time"], "content": p["content"], "note": p.get("note", ""), "weight": 0, "confirmed": True})
                 if db: db.collection("sessions").add({"membership_id": mid, "customer_id": cid, "session_date": p["session_date"], "content": p["content"], "confirmed": True, "confirmed_at": datetime.now().isoformat()})
-                st.success("✅ Đã xác nhận! Số buổi đã được cập nhật."); st.rerun()
+                st.success("✅ Đã xác nhận! Số buổi đã được cập nhật.") 
+                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                st.rerun()
         with col_no:
             if st.button(f"❌ Từ chối", key=f"reject_{p['id']}", use_container_width=True):
                 for pp in st.session_state.pending_list:
@@ -561,6 +566,7 @@ def page_record_session():
             st.session_state.pending_list.append(new_p)
             if db: db.collection("pending_sessions").add(new_p)
             st.success(f"✅ Đã gửi yêu cầu xác nhận đến {sel_mem['customer_name']}! Số buổi sẽ trừ sau khi khách xác nhận.")
+            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
             st.balloons()
 
 def page_pt_sessions():
@@ -681,7 +687,9 @@ def page_customers_owner():
                             new_m.update({"type":"session","sessions_total":q_sess,"sessions_done":0,"pt_id":q_pt_id,"pt_name":q_pt_name})
                         st.session_state.memberships.append(new_m)
                         if db: db.collection("memberships").add(new_m)
-                        st.success(f"✅ Đã giao gói '{q_pkg}' cho {selected_customer}!"); st.rerun()
+                        st.success(f"✅ Đã giao gói '{q_pkg}' cho {selected_customer}!") 
+                        time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                        st.rerun()
                     else:
                         st.error("Vui lòng nhập tên gói tập!")
 
@@ -698,7 +706,9 @@ def page_customers_owner():
                         st.session_state.memberships = [m for m in st.session_state.memberships if m.get("customer_name","") != selected_customer]
                         if db and cust_info and cust_info.get("id"):
                             db.collection("users").document(cust_info["id"]).delete()
-                        st.success(f"✅ Đã xóa khách hàng {selected_customer}!"); st.rerun()
+                        st.success(f"✅ Đã xóa khách hàng {selected_customer}!") 
+                        time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                        st.rerun()
                     else:
                         st.error("Tên xác nhận không khớp! Vui lòng nhập đúng tên khách hàng.")
         else:
@@ -764,7 +774,9 @@ def page_customers_owner():
                 else: new_m.update({"type":"session","sessions_total":g_sessions,"sessions_done":0,"pt_id":pt_id_sel,"pt_name":pt_name_sel})
                 st.session_state.memberships.append(new_m)
                 if db: db.collection("memberships").add(new_m)
-                st.success(f"✅ Đã giao gói '{g_pkg}' cho {g_customer}!"); st.rerun()
+                st.success(f"✅ Đã giao gói '{g_pkg}' cho {g_customer}!") 
+                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                st.rerun()
             else: st.error("Vui lòng chọn khách hàng và nhập tên gói tập!")
 
     # ── TAB 3: Thêm khách hàng mới ──
@@ -898,7 +910,9 @@ def page_packages():
                 else:
                     new_pkg.update({"type":"session","sessions":pg_sess})
                 st.session_state.custom_packages.append(new_pkg)
-                st.success(f"✅ Đã tạo gói '{pg_name}'!"); st.rerun()
+                st.success(f"✅ Đã tạo gói '{pg_name}'!") 
+                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                st.rerun()
             else:
                 st.error("Vui lòng nhập tên gói!")
 
@@ -918,7 +932,9 @@ def page_packages():
                     st.markdown(f'<div class="card" style="border-left-color:var(--danger)"><b>{del_pkg}</b> — Không có khách hàng đang sử dụng</div>', unsafe_allow_html=True)
                     if st.button(f"🗑️ Xóa gói '{del_pkg}'", use_container_width=True):
                         st.session_state.custom_packages = [p for p in st.session_state.custom_packages if p["name"] != del_pkg]
-                        st.success(f"✅ Đã xóa gói '{del_pkg}'!"); st.rerun()
+                        st.success(f"✅ Đã xóa gói '{del_pkg}'!") 
+                        time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                        st.rerun()
 
 def page_reports():
     st.markdown("# 📈 Báo cáo & Thống kê"); st.markdown("---")
@@ -1117,7 +1133,9 @@ def page_pts():
                             if m.get("customer_name","") == tr_cust and (m.get("pt_name","") == selected_pt or m.get("pt_name","") == f"PT {selected_pt}"):
                                 m["pt_name"] = tr_pt
                                 m["pt_id"] = tr_new_pt_id
-                        st.success(f"✅ Đã chuyển {tr_cust} sang PT {tr_pt}!"); st.rerun()
+                        st.success(f"✅ Đã chuyển {tr_cust} sang PT {tr_pt}!") 
+                        time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                        st.rerun()
                 elif not other_pts:
                     st.warning("Không có PT khác để chuyển. Vui lòng thêm PT mới trước.")
                 else:
@@ -1142,7 +1160,9 @@ def page_pts():
                                 st.session_state.pts_list = [pt for pt in st.session_state.pts_list if pt.get("name","") != selected_pt]
                                 if db and pt_info and pt_info.get("id"):
                                     db.collection("users").document(pt_info["id"]).delete()
-                                st.success(f"✅ Đã chuyển khách sang {bulk_pt} và xóa PT {selected_pt}!"); st.rerun()
+                                st.success(f"✅ Đã chuyển khách sang {bulk_pt} và xóa PT {selected_pt}!") 
+                                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                                st.rerun()
                             else:
                                 st.error("Tên xác nhận không khớp!")
                     else:
@@ -1154,7 +1174,9 @@ def page_pts():
                             st.session_state.pts_list = [pt for pt in st.session_state.pts_list if pt.get("name","") != selected_pt]
                             if db and pt_info and pt_info.get("id"):
                                 db.collection("users").document(pt_info["id"]).delete()
-                            st.success(f"✅ Đã xóa PT {selected_pt}!"); st.rerun()
+                            st.success(f"✅ Đã xóa PT {selected_pt}!") 
+                            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                            st.rerun()
                         else:
                             st.error("Tên xác nhận không khớp!")
         else:
@@ -1202,7 +1224,9 @@ def page_pts():
                     "role":"pt","specialty":p_spec,"experience":p_exp,"gender":p_gender,
                     "created_at":datetime.now().isoformat()
                 })
-                st.success(f"✅ Đã thêm PT {p_name}!"); st.rerun()
+                st.success(f"✅ Đã thêm PT {p_name}!") 
+                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+                st.rerun()
             else: st.error("Điền đầy đủ thông tin!")
 
 def main():

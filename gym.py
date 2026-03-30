@@ -322,7 +322,7 @@ def page_login():
         password=st.text_input("Mật khẩu",type="password",placeholder="••••••••")
         if st.button("Đăng nhập",use_container_width=True):
             if login(email,password): st.success("Đăng nhập thành công!") 
-            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+            #time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
             st.rerun()
             else: st.error("Sai email hoặc mật khẩu!")
         if not db:

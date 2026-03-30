@@ -1,5 +1,6 @@
 import streamlit as st
 import firebase_admin
+import time
 from firebase_admin import credentials, firestore
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -797,6 +798,7 @@ def page_customers_owner():
                     "note":n_note,"created_at":datetime.now().isoformat()
                 })
                 st.success(f"✅ Đã thêm khách hàng {n_name}!")
+                time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
                 st.rerun()
             else: st.error("Điền đầy đủ thông tin bắt buộc!")
 

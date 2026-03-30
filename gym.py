@@ -221,8 +221,12 @@ def login(email, password):
             u = doc.to_dict()
             if u.get("password") == password:
                 st.session_state.logged_in = True
-                st.session_state.user = {**u, "id": doc.id}
-                # FIX: load dữ liệu Firebase ngay sau khi login thành công
+                # Đảm bảo gán customer_id từ ID của document nếu trong field không có
+                st.session_state.user = {
+                    **u, 
+                    "id": doc.id,
+                    "customer_id": u.get("customer_id", doc.id) # QUAN TRỌNG: Dùng doc.id làm fallback
+                }
                 st.session_state.data_loaded = False
                 return True
 

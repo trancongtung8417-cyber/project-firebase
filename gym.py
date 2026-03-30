@@ -321,9 +321,7 @@ def page_login():
         email=st.text_input("Email",placeholder="email@fitpro.vn")
         password=st.text_input("Mật khẩu",type="password",placeholder="••••••••")
         if st.button("Đăng nhập",use_container_width=True):
-            if login(email,password): st.success("Đăng nhập thành công!") 
-            #time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
-            st.rerun()
+            if login(email,password): st.success("Đăng nhập thành công!"); st.rerun()
             else: st.error("Sai email hoặc mật khẩu!")
         if not db:
             st.markdown("""<div style="background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.3);border-radius:10px;padding:1rem;margin-top:1rem;font-size:.8rem">
@@ -566,7 +564,7 @@ def page_record_session():
             st.session_state.pending_list.append(new_p)
             if db: db.collection("pending_sessions").add(new_p)
             st.success(f"✅ Đã gửi yêu cầu xác nhận đến {sel_mem['customer_name']}! Số buổi sẽ trừ sau khi khách xác nhận.")
-            time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
+            #time.sleep(2) # Dừng 2 giây để khách kịp nhìn thấy
             st.balloons()
 
 def page_pt_sessions():
